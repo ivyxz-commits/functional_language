@@ -2,11 +2,11 @@
 
 #include <string>
 
+//чтобы TokenType не конфликтовало с другими (именами) частями программы
 namespace Lexer{ 
 
 //перечисление типов токенов
 enum class TokenType{ 
-
     //ключевые слова
     KW_FN,
     KW_MAIN,
@@ -149,5 +149,23 @@ constexpr const char* TokenTypeName(TokenType t) noexcept {
         default: return "<unknown>"; //если неизвестный нам тип
     }
 }
+
+
+//предлагаю использовать структуру заместо класса, так как нужны простые контейнеры данных, а не сложная логика и методы
+//структура позиции токена для более детального вывода местоположения ошибки
+struct SourcePos{ 
+    int line = 1;
+    int column = 1;
+};
+
+struct Token{ 
+    TokenType type; 
+    std::string lexeme; //абстрактная единица языка
+    SourcePos pos;
+
+    //конструктор структуры для быстрого создания токенов
+    Token(TokenType t, std::string lex, SourcePos p)
+        : type(t), lexeme(std::move(lex)), pos(p) {}
+};
 
 }
