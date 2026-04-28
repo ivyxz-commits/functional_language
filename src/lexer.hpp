@@ -1,7 +1,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <expected>
 #include "tokens.hpp" 
+
 
 namespace Lexer{ 
 
@@ -18,5 +21,43 @@ struct LexError{
 };
 
 
+//превращение текста в токены, наш лексер
+class Lexer{ 
+
+public:
+    Lexer(std::string source, std::string filename = "<input>");
+    std::expected<std::vector<Token>, LexError> tokenize(); //разбивает на токены
+
+private: 
+    std::string m_source;  //наш исходный текст
+    std::string m_filename;
+
+    //позиции в исходном тексте
+    std::size_t m_pos = 0;
+    int m_line = 1;
+    int m_col = 1;
+
+    //вспомогательные методы
+    bool atEnd() const; //дошли ли до конца текста
+    char peek(std::size_t offset = 0) const;
+    char advance(); //взять символ, сдвинуть нашу позицию и вернуть символ
+    bool match(char expected);
+    SourcePos CurrentPos() const; //текущая позиция
+
+    void skipWhitespacesandComments();
+
+    std::expected<Token, LexError> nextToken();
+
+    //отдельные функции для разных токенов
+    std::expected<Token, LexError>scanNumber(SourcePos start);
+    std::expected<Token, LexError>scanString(SourcePos start); //строковый литерал
+    std::expected<Token, LexError>scanIdentOrKeyword(SourcePos start);
+
+    //проверяет является ли слово ключевым
+    //если слово простое и не зарезервированно, то возвращает IDENT
+    
+    LexError makeError(std::string msg) const; //удобная функция для создания ошибки
+
+}; 
 
 }
