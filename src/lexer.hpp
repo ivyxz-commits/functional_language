@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <expected>
+#include <expected> //шаблон для явной обработки ошибки std::expected<T, E>
 #include "tokens.hpp" 
 
 
@@ -41,21 +41,22 @@ private:
     bool atEnd() const; //дошли ли до конца текста
     char peek(std::size_t offset = 0) const;
     char advance(); //взять символ, сдвинуть нашу позицию и вернуть символ
-    bool match(char expected);
+    bool match(char expected); //часто для логических операторов
     SourcePos CurrentPos() const; //текущая позиция
 
     void skipWhitespacesandComments();
 
     std::expected<Token, LexError> nextToken();
 
+    //проверяет является ли слово ключевым, либо это литерал
+    //если слово простое и не зарезервированно, то возвращает IDENT
+    static TokenType classifyWord(const std::string& word);    
+
     //отдельные функции для разных токенов
     std::expected<Token, LexError>scanNumber(SourcePos start);
     std::expected<Token, LexError>scanString(SourcePos start); //строковый литерал
     std::expected<Token, LexError>scanIdentOrKeyword(SourcePos start);
 
-    //проверяет является ли слово ключевым
-    //если слово простое и не зарезервированно, то возвращает IDENT
-    
     LexError makeError(std::string msg) const; //удобная функция для создания ошибки
 
 }; 
