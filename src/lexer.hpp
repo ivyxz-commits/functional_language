@@ -42,7 +42,7 @@ private:
     char peek(std::size_t offset = 0) const;
     char advance(); //взять символ, сдвинуть нашу позицию и вернуть символ
     bool match(char expected); //часто для логических операторов
-    SourcePos CurrentPos() const; //текущая позиция
+    SourcePos currentPos() const; //текущая позиция
 
     void skipWhitespacesandComments();
 
