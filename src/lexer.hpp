@@ -13,6 +13,10 @@ struct LexError{
     std::string message;
     SourcePos pos;
 
+    //конструктор, вообще говоря необязателен
+    /*LexError(std::string msg, SourcePos p)
+        : message(std::move(msg)), pos(p) {} */
+
     //функция форматирования ошибки в вид file:line:column: error: msg
     std::string format(const std::string& filename) const { 
         return filename + ":" + std::to_string(pos.line) + ":" + 

@@ -87,6 +87,7 @@ enum class TokenType{
 };
 
 //возвратим читаемое имя типа токена (чтобы отлаживать и сообщать об ошибках)
+//для красивого вывода ошибок в парсере
 constexpr const char* TokenTypeName(TokenType t) noexcept { 
     switch(t){ 
         case TokenType::KW_FN: return "fn";
@@ -165,8 +166,9 @@ struct Token{
     SourcePos pos;
 
     //конструктор структуры для быстрого создания токенов
-    Token(TokenType t, std::string lex, SourcePos p)
-        : type(t), lexeme(std::move(lex)), pos(p) {}
+    //здесь конструктор также необязателен
+    /*Token(TokenType t, std::string lex, SourcePos p)
+        : type(t), lexeme(std::move(lex)), pos(p) {} */
 };
 
 }
