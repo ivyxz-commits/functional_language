@@ -128,6 +128,7 @@ constexpr const char* TokenTypeName(TokenType t) noexcept {
         case TokenType::OP_SLASH: return "/";
         case TokenType::OP_PERCENT: return "%";
         case TokenType::OP_EQ: return "=";
+        case TokenType::OP_NEQ: return "!=";
         case TokenType::OP_LT: return "<";
         case TokenType::OP_LE: return "<=";
         case TokenType::OP_GT: return ">";

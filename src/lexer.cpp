@@ -75,12 +75,11 @@ LexError Lexer::makeError(std::string msg) const {
 }
 
 
-
 void Lexer::skipWhitespacesandComments(){ 
     while(!atEnd()){ 
         char c = peek();
 
-        if(std::isspace(static_cast<unsigned char>(c))){ 
+        if(std::isspace(static_cast<unsigned char>(c))){  //использование cctype
             advance();
         } else if (c == '/' && peek(1) == '/') { 
             while(!atEnd() && peek() != '\n'){ 
@@ -90,6 +89,70 @@ void Lexer::skipWhitespacesandComments(){
             break;
         }
     }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//основные функции разбивки на токены
+//прочитать один токен
+std::expected<Token, LexError> Lexer::nextToken(){ 
+    SourcePos start = currentPos();
+    char c = advance();
+
+    if(static_cast<unsigned char>(c) > 127){ 
+        return std::unexpected(makeError("В тексте присутсвует не ASCII символ"));
+    }
+
+    switch(c){ 
+        case '(': return Token{TokenType::DELIM_LPAREN, "(", start};
+        case ')': return Token{TokenType::DELIM_RPAREN, ")", start};
+        case '|': return Token{TokenType::OP_PIPE, "|", start}; //ADT
+        case '//': return Token{TokenType::OP_BACKSLASH, "//", start};
+        case '+': return Token{TokenType::OP_PLUS, "+", start};
+        case '%': return Token{TokenType::OP_PERCENT, "%", start};
+        case '.': return Token{TokenType::OP_DOT, ".", start};
+        case ':': return Token{TokenType::OP_COLON, ":", start};
+        case '*': return Token{TokenType::OP_STAR, "*", start};
+        case ',': return Token{TokenType::DELIM_COMMA, ",", start};
+        case '[': return Token{TokenType::DELIM_LBRACKET, "[", start};
+        case ']': return Token{TokenType::DELIM_RBRACKET, "]", start};
+        case '{': return Token{TokenType::DELIM_LBRACE, "{", start};
+        case '}': return Token{TokenType::DELIM_RBRACE, "}", start};
+        
+        case '=':
+            if(match('=')) return Token{TokenType::OP_EQ, "==", start};
+            return Token{TokenType::OP_ASSIGN, "=", start};
+        case '!': 
+            if(match('=')) return Token{TokenType::OP_NEQ, "!=", start};
+            return std::unexpected(LexError{"unexpected charatcer '!'", start});
+        case '-':
+            if(match('>'))return Token{TokenType::OP_ARROW, "->", start};
+            return Token{TokenType::OP_MINUS, "-", start};
+        case '<':
+            if(match('=')) return Token{TokenType::OP_LE, "<=", start};
+            return Token{TokenType::OP_LT, "<", start};
+        case '>':
+            if(match('=')) return Token{TokenType::OP_GE, "<=", start};
+            return Token{TokenType::OP_GT, ">", start};
+        case '/':
+            return Token{TokenType::OP_SLASH, "/", start};
+        case '"': 
+            return scanString(start);
+
+        default:
+            break;
+    }
+
+    if(std::isdigit(static_cast<unsigned char>(c))){ 
+        return scanNumber(start);
+    }
+
+    if(std::isalpha(static_cast<int>(c)) || c == '_'){ 
+        return scanIdentOrKeyword(start);
+    }
+
+    //если ничего не найдено
+    return std::unexpected(LexError{std::string("unexpected character '") + c + "'", start});
 }
 
 

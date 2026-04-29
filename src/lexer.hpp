@@ -46,7 +46,7 @@ private:
 
     void skipWhitespacesandComments();
 
-    std::expected<Token, LexError> nextToken();
+    std::expected<Token, LexError> nextToken(); //прочитать один токен
 
     //проверяет является ли слово ключевым, либо это литерал
     //если слово простое и не зарезервированно, то возвращает IDENT
