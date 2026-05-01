@@ -13,6 +13,8 @@ using Pos = Lexer::SourcePos;
 
 template<typename T>
 using Ptr = std::unique_ptr<T>;
+//это намного упрощает запись на Ptr<Typenode>, т.к дерево рекурсивного спуска
+
 
 //Основные типы узлов
 
@@ -38,15 +40,37 @@ struct FucnParam{
     Pos pos;
 };
 
+//fn name(params) -> returnType = expr
 struct FuncDecl{ 
     std::string name;
     std::vector<FucnParam> params;
     Ptr<ExprNode> body;
-    std::optional
+    std::optional<Ptr<TypeNode>> returnType;
     Pos pos;
 };
 
+//конструктор ADT
+struct ConstructorDecl{ 
+    std::string name;
+    std::vector<Ptr<TypeNode>> fields; //типы полей конструктора
+    Pos pos;
+};
+
+//data name[typeParams1, typeParams2] = | None | First(type1) | Second(type2)
+struct dataDecl{ 
+    std::string name;
+    std::vector<std::string> typeParams;
+    std::vector<ConstructorDecl> constructors;
+    Pos pos;
+};
+
+
+
+
+
+
 struct DeclNode{ 
+
 };
 
 struct Program{ 
