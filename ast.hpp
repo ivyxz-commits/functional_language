@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 #include "tokens.hpp"
 
 
@@ -28,7 +29,22 @@ struct PatternNode;
 struct ExprNode;
 
 
-//одним из самых высоких узлов будет узел объявления
+//самые высокий узед - объявления
+
+//просто один параметр функции
+struct FucnParam{ 
+    std::string name;
+    Ptr<TypeNode> type; //принадлежит только этому параметру, не нужно хранить в нескольких местах
+    Pos pos;
+};
+
+struct FuncDecl{ 
+    std::string name;
+    std::vector<FucnParam> params;
+    Ptr<ExprNode> body;
+    std::optional
+    Pos pos;
+};
 
 struct DeclNode{ 
 };
