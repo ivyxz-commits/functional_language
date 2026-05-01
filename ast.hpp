@@ -31,6 +31,118 @@ struct PatternNode;
 //Узлы выражений
 struct ExprNode;
 
+
+//Primary
+struct IntLitExpr{ 
+    long long value;
+    Pos pos;
+};
+
+struct RealLitExpr{ 
+    double value;
+    Pos pos;
+};
+
+struct StringLitExpr{ 
+    std::string value;
+    Pos pos;
+};
+
+struct BoolLitExpr{ 
+    bool value;
+    Pos pos;
+};
+
+struct UnitLitExpr{Pos pos;};
+
+struct IdentExpr{ 
+    std::string name; 
+    Pos pos;
+};
+
+
+struct UnaryExpr{ 
+    std::string op; //"-", "not"
+    Ptr<ExprNode> operand;
+    Pos pos;
+};
+
+struct BinaryExpt{ 
+    std::string op; 
+    Ptr<ExprNode> left;
+    Ptr<ExprNode> right;
+    Pos pos;
+};
+
+//ExprNode так как obj.method()
+struct CallExpr{ 
+    Ptr<ExprNode> callee;
+    std::vector<Ptr<ExprNode>> args;
+    Pos pos;
+};
+
+//point.x //object = IdentExpr 
+struct FieldAccesExpr{ 
+    Ptr<ExprNode> object;
+    std::string field;
+    Pos pos;
+};
+
+struct IfExpr{ 
+    Ptr<ExprNode> cond;
+    Ptr<ExprNode> thenBranch;
+    Ptr<ExprNode> elseBranch;
+    Pos pos;
+}; 
+
+//Сравнение патернов
+//pattern -> expr
+struct MatchArm{ 
+    Ptr<PatternNode> pattern;
+    Ptr<ExprNode> body;
+    Pos pos;
+};
+
+//match expr {arm1, arm2, ...}
+struct MatchExpr{ 
+    Ptr<ExprNode> target; //то, что изучаем
+    std::vector<MatchArm> arms;
+    Pos pos;
+};
+
+
+//let x = 5 или let x: int64 = 5;
+struct LetBinding{ 
+    std::string name;
+    std::optional<Ptr<TypeNode>> type;
+    Ptr<ExprNode> value;
+    Pos pos;
+};
+
+//let x = 5, y = 6 + 1 in ... // let x = 5 in x + 1
+struct LerInExpr{ 
+    std::vector<LetBinding> bindings; 
+    Ptr<ExprNode> body;
+    Pos pos;
+}
+
+//красивый пример на эти два блока 
+/* let result = match x {
+  Some(v) -> v,
+  None    -> 0
+} in result + 1 */
+
+
+
+
+
+using ExprNodeVar = std::variant<>;
+
+struct ExprNode{ 
+    ExprNodeVar var;
+    Pos pos;
+};
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //самые высокий узел - объявления
 
@@ -91,7 +203,7 @@ using DeclNodeVar = std::variant<
 >;
 
 struct DeclNode{ 
-    DeclNodeVar Var;
+    DeclNodeVar var;
     Pos pos;
 };
 
