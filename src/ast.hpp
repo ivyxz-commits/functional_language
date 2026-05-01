@@ -16,7 +16,7 @@ template<typename T>
 using Ptr = std::unique_ptr<T>;
 //это намного упрощает запись на Ptr<Typenode>, т.к дерево рекурсивного спуска
 
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //узлы типов
 struct TypeNode;
 
@@ -71,8 +71,22 @@ struct Typenode{
 };
 
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //узлы образцов
 struct PatternNode;
+
+//как обработка всех других случаев (default case)
+struct WildcardPatternNode{ 
+    Pos pos;
+};
+
+
+using PatternNodeVar = std::variant<>;
+
+struct PatternNode{ 
+    PatternNodeVar var;
+    Pos pos;
+};
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Узлы выражений
@@ -127,6 +141,16 @@ struct CallExpr{
     Pos pos;
 };
 
+/* пример:
+    method(-5, not flag, x + 1)
+
+    *callee = IdentExpr("method")
+    *args = [
+    UnaryExpr("-", IntLitExpr(5))
+    UnaryExpr("not", IdentExpr("flag"))
+    BinaryExpr("+", IdentExpr("x"), IntLitExpr(1))
+    *]
+*/
 //point.x //object = IdentExpr 
 struct FieldAccessExpr{ 
     Ptr<ExprNode> object;
@@ -172,7 +196,7 @@ struct LetInExpr{
     Pos pos;
 };
 
-//красивый пример на эти два блока 
+//пример применения этих двух выражений
 /* let result = match x {
   Some(v) -> v,
   None    -> 0
