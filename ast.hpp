@@ -17,11 +17,58 @@ using Ptr = std::unique_ptr<T>;
 //это намного упрощает запись на Ptr<Typenode>, т.к дерево рекурсивного спуска
 
 
-//Основные типы узлов
-
-
 //узлы типов
 struct TypeNode;
+
+//int8, bool, string, unit
+struct BuiltinTypeNode{ 
+    std::string name;
+    Pos pos;
+};
+
+//user's type: IDENT
+struct SimpleTypeNode{ 
+    std::string name;
+    Pos pos;
+};
+
+struct TupleTypeNode{ 
+    std::vector<Ptr<TypeNode>> elems;
+    Pos pos;
+};
+
+struct ListTypeNode{ 
+    Ptr<TypeNode> elemType;
+    Pos pos; 
+};
+
+//что функция принимает и что возвращает
+struct FunctionTypeNode{ 
+    Ptr<TypeNode> from;
+    Ptr<TypeNode> to;
+    Pos pos;
+};   
+
+//IDENT [type]
+struct GenericTypeNode{ 
+    std::string name; //IDENT
+    std::vector<Ptr<TypeNode>> args;
+    Pos pos;
+};
+
+using TypeNodeVar = std::variant<
+    BuiltinTypeNode,
+    SimpleTypeNode,
+    TupleTypeNode,
+    ListTypeNode,
+    FunctionTypeNode,
+    GenericTypeNode
+>;
+
+struct Typenode{ 
+    TypeNodeVar var;
+    Pos pos;
+};
 
 
 //узлы образцов
