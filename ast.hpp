@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <variant>
 #include "tokens.hpp"
 
 
@@ -26,12 +27,14 @@ struct TypeNode;
 //узлы образцов
 struct PatternNode;
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Узлы выражений
 struct ExprNode;
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//самые высокий узел - объявления
 
-//самые высокий узед - объявления
+struct DeclNode; 
 
 //просто один параметр функции
 struct FucnParam{ 
@@ -49,6 +52,7 @@ struct FuncDecl{
     Pos pos;
 };
 
+
 //конструктор ADT
 struct ConstructorDecl{ 
     std::string name;
@@ -57,26 +61,42 @@ struct ConstructorDecl{
 };
 
 //data name[typeParams1, typeParams2] = | None | First(type1) | Second(type2)
-struct dataDecl{ 
+struct DataDecl{ 
     std::string name;
     std::vector<std::string> typeParams;
     std::vector<ConstructorDecl> constructors;
     Pos pos;
 };
 
+//module name{ other decls }
+struct ModuleDecl{ 
+    std::string name;
+    std::vector<Ptr<DeclNode>> decls;
+    Pos pos;
+};
 
+//псведонимы type Alias = type
+struct TypeAliasDecl{ 
+    std::string name; //IDENT
+    Ptr<TypeNode> type;
+    Pos pos;
+}; 
 
-
-
+//еще псевдоним для лучшего хранения вариантов объявления
+using DeclNodeVar = std::variant<
+    FuncDecl,
+    DataDecl,
+    TypeAliasDecl,
+    ModuleDecl
+>;
 
 struct DeclNode{ 
-
+    DeclNodeVar Var;
+    Pos pos;
 };
 
 struct Program{ 
     std::vector<Ptr<DeclNode>> decls; 
 };
-
-
 
 }
