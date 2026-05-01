@@ -31,8 +31,7 @@ struct PatternNode;
 //Узлы выражений
 struct ExprNode;
 
-
-//Primary
+//Примитивные выражения
 struct IntLitExpr{ 
     long long value;
     Pos pos;
@@ -67,7 +66,7 @@ struct UnaryExpr{
     Pos pos;
 };
 
-struct BinaryExpt{ 
+struct BinaryExpr{ 
     std::string op; 
     Ptr<ExprNode> left;
     Ptr<ExprNode> right;
@@ -82,7 +81,7 @@ struct CallExpr{
 };
 
 //point.x //object = IdentExpr 
-struct FieldAccesExpr{ 
+struct FieldAccessExpr{ 
     Ptr<ExprNode> object;
     std::string field;
     Pos pos;
@@ -120,11 +119,11 @@ struct LetBinding{
 };
 
 //let x = 5, y = 6 + 1 in ... // let x = 5 in x + 1
-struct LerInExpr{ 
+struct LetInExpr{ 
     std::vector<LetBinding> bindings; 
     Ptr<ExprNode> body;
     Pos pos;
-}
+};
 
 //красивый пример на эти два блока 
 /* let result = match x {
@@ -133,10 +132,57 @@ struct LerInExpr{
 } in result + 1 */
 
 
+struct LambdaExpr{ 
+    std::vector<std::string> params;
+    Ptr<ExprNode> body;
+    Pos pos;
+};
+
+//Tuple(1, Tuple(2, 3), f(x) + 5)
+struct TupleExpr{ 
+    std::vector<Ptr<ExprNode>> elems;
+    Pos pos;
+};
+
+struct ListExpr{ 
+    std::vector<Ptr<ExprNode>> elems;
+    Pos pos; 
+};
 
 
+struct ConstructorExpr{ 
+    std::string name;
+    std::vector<Ptr<ExprNode>> args;
+    Pos pos;
+};
+/* data Shape = Circle(float64) | Rect(float64, float64) - декларация
 
-using ExprNodeVar = std::variant<>;
+/\ отдельные блоки конструктора как выражения
+fn area(s: Shape) -> float64 =
+  match s {
+    Circle(r) -> r * r,
+    Rect(w, h) -> w * h
+  } */
+
+using ExprNodeVar = std::variant<
+    IntLitExpr,
+    RealLitExpr, 
+    StringLitExpr,
+    BoolLitExpr,
+    UnitLitExpr,
+    IdentExpr,
+    UnaryExpr,
+    BinaryExpr,
+    CallExpr,
+    FieldAccessExpr,
+    IfExpr,
+    MatchExpr,
+    LetInExpr,
+    LambdaExpr,
+    TupleExpr,
+    ListExpr,
+    ConstructorExpr
+>;
 
 struct ExprNode{ 
     ExprNodeVar var;
@@ -144,7 +190,7 @@ struct ExprNode{
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//самые высокий узел - объявления
+//самый высокий узел - объявления
 
 struct DeclNode; 
 
@@ -207,6 +253,7 @@ struct DeclNode{
     Pos pos;
 };
 
+//основная программа
 struct Program{ 
     std::vector<Ptr<DeclNode>> decls; 
 };
