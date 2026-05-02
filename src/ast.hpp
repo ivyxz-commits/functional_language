@@ -16,7 +16,7 @@ template<typename T>
 using Ptr = std::unique_ptr<T>;
 //это намного упрощает запись на Ptr<Typenode>, т.к дерево рекурсивного спуска
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //узлы типов
 struct TypeNode;
 
@@ -49,7 +49,7 @@ struct FunctionTypeNode{
     Pos pos;
 };   
 
-//IDENT [type]
+//IDENT [type] - Шаблон
 struct GenericTypeNode{ 
     std::string name; //IDENT
     std::vector<Ptr<TypeNode>> args;
@@ -80,8 +80,64 @@ struct WildcardPatternNode{
     Pos pos;
 };
 
+//"name", yep, nope, 80, 9.64
+struct LiteralPatternNode{ 
+    std::string value;
+    enum class Kind {Int, Real, String, Bool} kind;
+    Pos pos;
+};
 
-using PatternNodeVar = std::variant<>;
+//связывает переменную
+struct NamePatternNode{ 
+    std::string name;
+    Pos pos;
+};
+
+/*  match 10 {
+    x -> x + 1
+    *берет значение которое пришло и дает ему имя
+    }  */
+
+struct TuplePatternNode{ 
+    std::vector<Ptr<PatternNode>> elems; 
+    Pos pos;
+};
+
+struct ListPatternNode{ 
+    std::vector<Ptr<PatternNode>> elems;
+    Pos pos;
+};
+
+//Some(10), потом Some(x)
+struct ConstructorPatternNode{ 
+    std::string name;
+    std::vector <Ptr<PatternNode>> args;
+    Pos pos;
+};
+
+//пришло из Lisp constructor - строить
+struct ConsPatternNode{ 
+    Ptr<PatternNode> head;
+    Ptr<PatternNode> tail;
+    Pos pos;
+};
+
+//рекурсивная сумма списка
+/* fn sum(xs: [int64]) -> int64 =
+    match xs {
+        [] -> 0,
+        x : rest -> x + sum(rest)
+    } */
+
+using PatternNodeVar = std::variant<
+    WildcardPatternNode,
+    LiteralPatternNode,
+    NamePatternNode,
+    TuplePatternNode,
+    ListPatternNode,
+    ConstructorPatternNode,
+    ConsPatternNode
+>;
 
 struct PatternNode{ 
     PatternNodeVar var;
