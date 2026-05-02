@@ -56,6 +56,14 @@ struct GenericTypeNode{
     Pos pos;
 };
 
+/* data Result[value, error] = Ok(value) | Error(error)
+
+fn divide(a: int64, b: int64) -> Result[int64, string] = 
+    if b == 0
+    then Error("division by zero")
+    else Ok(a/b)
+*/
+
 using TypeNodeVar = std::variant<
     BuiltinTypeNode,
     SimpleTypeNode,
