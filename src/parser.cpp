@@ -12,9 +12,17 @@ Parser::Parser(std::vector<Lexer::Token> tokens, std::string filename)
 std::expected<Program, ParseError> Parser::parse(){ 
     Program prog; //пустой объект программы
 
-    while(!atEnd()){ 
-    }
+    while(!atEnd()){
+        auto decl = parseDecl();
+        if(!decl) return std::unexpected(decl.error()); //просто читаем ошибку
+        prog.decls.push_back(std::move(*decl));
+     }
+    return prog;
 }
 
+const Lexer::Token& Parser::peek(std::size_t offset){ 
+    
+}
+     
 
 }
