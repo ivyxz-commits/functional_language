@@ -28,6 +28,7 @@ private:
     std::string m_filename;
     std::size_t m_pos; //текущий индекс в m_pos
 
+    //основные функции работы с токенами
     const Lexer::Token& peek(std::size_t offset = 0) const;
     const Lexer::Token& current() const;
     bool atEnd() const;
@@ -44,7 +45,19 @@ private:
     ParseError makeError(std::string msg) const;
     ParseError makeErrorAt(std::string msg, Lexer::SourcePos pos) const; 
 
-    
+    //разбор объявлений 
+    std::expected<Ptr<DeclNode>, ParseError> parseDecl(); //финальный узел дерева
+    std::expected<FuncDecl, ParseError> parseFuncDecl();  //промежуточный результат
+    std::expected<TypeAliasDecl, ParseError> parseTypeAliasDecl();
+    std::expected<DataDecl, ParseError> parseDataDecl();
+    std::expected<ModuleDecl, ParseError> parseModuleDecl();
+
+    //разбор типов
+    std::expected<Ptr<TypeNode>, ParseError> parseType();
+    std::expected<Ptr<TypeNode>, ParseError> parseAtomicType(); //во избежание бесконечного зацикливания
+
+    std::expected<Ptr<PatternNode>, ParseError> parsePattern();
+    std::expected<Ptr<PatternNode>, ParseError> parsePrimaryPattern(); 
 
     //Разбор выражений
     std::expected<Ptr<ExprNode>, ParseError> parseExpr();
@@ -59,8 +72,16 @@ private:
     std::expected<Ptr<ExprNode>, ParseError> parseAdditive();
     std::expected<Ptr<ExprNode>, ParseError> parseMultiplicative();
     std::expected<Ptr<ExprNode>, ParseError> parseUnary();
-    std::expected<Ptr<ExprNode>, ParseError> parsePostfix();
+    std::expected<Ptr<ExprNode>, ParseError> parsePostfix(); //цепочка операций после основного выражения
     std::expected<Ptr<ExprNode>, ParseError> parsePrimary();
+
+    //вспомогательные функции
+    std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
+    std::expected<FuncParam, ParseError> parseFuncParam();
+    std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и mut
+
+    bool isTypeStart() const; //"+" и 5 - не начало типа к примеру (оператор и число)
+    static bool isBuiltinTypeName(const std::string& name); //не привязан к объекту класса
 
 };
 

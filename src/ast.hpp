@@ -330,7 +330,7 @@ struct ExprNode{
 struct DeclNode; 
 
 //просто один параметр функции
-struct FucnParam{ 
+struct FuncParam{ 
     std::string name;
     Ptr<TypeNode> type; //принадлежит только этому параметру, не нужно хранить в нескольких местах
     Pos pos;
@@ -339,7 +339,7 @@ struct FucnParam{
 //fn name(params) -> returnType = expr
 struct FuncDecl{ 
     std::string name;
-    std::vector<FucnParam> params;
+    std::vector<FuncParam> params;
     Ptr<ExprNode> body;
     std::optional<Ptr<TypeNode>> returnType;
     Pos pos;
