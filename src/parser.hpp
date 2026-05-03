@@ -80,6 +80,13 @@ private:
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
     std::expected<FuncParam, ParseError> parseFuncParam();
     std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и mut
+
+    //data name[typeParams1, typeParams2] = | None | First(type1) | Second(type2) //typeParams ::= '[' IDENT (',' IDENT)* ']'
+    std::expected<std::vector<std::string>, ParseError> parseTypeParams();
+    //IDENT '(' type (',' type)* ')' - разбираем один конструктор ADT
+    std::expected<ConstructorDecl, ParseError> parseConstructorDecl();
+
+    
 };
 
 }

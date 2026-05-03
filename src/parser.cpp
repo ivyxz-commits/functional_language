@@ -221,22 +221,9 @@ std::expected<DataDecl, ParseError> Parser::parseDataDecl(){
     auto nameTok = expect(TT::IDENT);
     if(!nameTok) return std::unexpected(nameTok.error());
 
-    // '[' IDENT (',' IDENT)* ']'
-    std::vector<std::string> typeParams;
-    if(match(TT::DELIM_LBRACKET)){ 
-        auto tp = expect(TT::IDENT);
-        if(!tp) return std::unexpected(tp.error());
-        typeParams.push_back(tp -> lexeme);
-
-        while(match(TT::DELIM_COMMA)){ 
-            auto tp = expect(TT::IDENT);
-            if(!tp) return std::unexpected(tp.error());
-            typeParams.push_back(tp -> lexeme);
-        }
-
-        auto rb = expect(TT::DELIM_RBRACKET); 
-        if(!rb) return std::unexpected(rb.error());
-    }
+    //параметры типа: [a, b, ...]
+    auto typeParams = parseTypeParams();
+    if(!typeParams) return std::unexpected(typeParams.error());
 
     auto eq = expect (TT::OP_ASSIGN);
     if(!eq) return std::unexpected(eq.error());
@@ -244,39 +231,17 @@ std::expected<DataDecl, ParseError> Parser::parseDataDecl(){
     //data name[typeParams1, typeParams2] = | None | First(type1) | Second(type2)
     std::vector<ConstructorDecl> constructors;
 
-    auto parseConstructor = [&]() -> std::expected<ConstructorDecl, ParseError>{ //берем внешние методы и переменные по ссылке, = копируем
-        auto cpos = currentPos();
-        auto cname = expect(TT::IDENT);
-        if(!cname) return std::unexpected(cname.error());
-
-        std::vector<Ptr<TypeNode>> fields;
-        if(match(TT::DELIM_LPAREN)){ 
-            auto ft = parseType();
-            if(!ft) return std::unexpected(ft.error());
-            fields.push_back(std::move(*ft)); //unique_ptr
-
-            while(match(TT::DELIM_COMMA)){ 
-                auto ft  = parseType();
-                if(!ft) return std::unexpected(ft.error());
-                fields.push_back(std::move(*ft));
-            }
-            auto rp = expect(TT::DELIM_RPAREN);
-            if(!rp) return std::unexpected(rp.error());
-        }
-        return ConstructorDecl{cname -> lexeme, std::move(fields), cpos};
-    };
-
-    auto first = parseConstructor();
+    auto first = parseConstructorDecl();
     if(!first) return std::unexpected(first.error());
     constructors.push_back(std::move(*first));
 
     while(match(TT::OP_PIPE)){ 
-        auto c = parseConstructor();
+        auto c = parseConstructorDecl();
         if(!c) return std::unexpected(c.error());
         constructors.push_back(std::move(*c));
     }
 
-    return DataDecl{nameTok->lexeme, std::move(typeParams), std::move(constructors), pos};
+    return DataDecl{nameTok->lexeme, std::move(*typeParams), std::move(constructors), pos};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,5 +264,57 @@ std::expected<FuncParam, ParseError> Parser::parseFuncParam(){
 
     return FuncParam{nameTok -> lexeme, std::move(*t), pos};
 }
+
+//функция разбора параметров обобщенного типа
+std::expected<std::vector<std::string>, ParseError> Parser::parseTypeParams(){ 
+    using TT = Lexer::TokenType;
+
+    std::vector<std::string> typeParams;
+
+    if(!match(TT::DELIM_LBRACKET)){
+        return typeParams; 
+    }
+
+    auto tp = expect(TT::IDENT);
+    if(!tp) return std::unexpected(tp.error());
+    typeParams.push_back(tp -> lexeme);
+
+    while(match(TT::DELIM_COMMA)){ 
+        auto tp = expect(TT::IDENT);
+        if(!tp) return std::unexpected(tp.error());
+        typeParams.push_back(tp -> lexeme);
+    }
+
+    auto rb = expect(TT::DELIM_RBRACKET); 
+    if(!rb) return std::unexpected(rb.error());
+
+    return typeParams;
+}
+
+//Разбираем один конструктор ADT
+std::expected<ConstructorDecl, ParseError> Parser::parseConstructorDecl(){ 
+    using TT = Lexer::TokenType;
+
+    auto pos = currentPos();
+    auto nameTok = expect(TT::IDENT);
+    if (!nameTok) return std::unexpected(nameTok.error());
+
+    std::vector<Ptr<TypeNode>> fields;
+        if(match(TT::DELIM_LPAREN)){ 
+            auto ft = parseType();
+            if(!ft) return std::unexpected(ft.error());
+            fields.push_back(std::move(*ft)); //unique_ptr
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto ft  = parseType();
+                if(!ft) return std::unexpected(ft.error());
+                fields.push_back(std::move(*ft));
+            }
+            auto rp = expect(TT::DELIM_RPAREN);
+            if(!rp) return std::unexpected(rp.error());
+        }
+        return ConstructorDecl{nameTok -> lexeme, std::move(fields), pos};
+}
+
 
 }
