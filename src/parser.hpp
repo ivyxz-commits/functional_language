@@ -26,7 +26,7 @@ public:
 private:
     std::vector<Lexer::Token> m_tokens;
     std::string m_filename;
-    std::size_t m_pos; //текущий индекс в m_pos
+    std::size_t m_pos = 0; //текущий индекс в m_pos
 
     //основные функции работы с токенами
     const Lexer::Token& peek(std::size_t offset = 0) const;
