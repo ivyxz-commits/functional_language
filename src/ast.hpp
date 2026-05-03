@@ -26,7 +26,7 @@ struct BuiltinTypeNode{
     Pos pos;
 };
 
-//user's type: IDENT
+//user's type: IDENT - просто имя без параметров
 struct SimpleTypeNode{ 
     std::string name;
     Pos pos;
@@ -37,6 +37,8 @@ struct TupleTypeNode{
     Pos pos;
 };
 
+//только для аннотации типов 
+//fn sum(xs: [int64]) -> int64 = ...
 struct ListTypeNode{ 
     Ptr<TypeNode> elemType;
     Pos pos; 
@@ -73,7 +75,7 @@ using TypeNodeVar = std::variant<
     GenericTypeNode
 >;
 
-struct Typenode{ 
+struct TypeNode{ 
     TypeNodeVar var;
     Pos pos;
 };

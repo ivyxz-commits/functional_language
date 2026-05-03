@@ -55,7 +55,7 @@ private:
 
     //разбор типов
     std::expected<Ptr<TypeNode>, ParseError> parseType();
-    std::expected<Ptr<TypeNode>, ParseError> parseAtomicType(); //во избежание бесконечного зацикливания
+    std::expected<Ptr<TypeNode>, ParseError> parseAtomicType(); //во избежание бесконечного зацикливания parseType()
 
     std::expected<Ptr<PatternNode>, ParseError> parsePattern();
     std::expected<Ptr<PatternNode>, ParseError> parsePrimaryPattern(); 

@@ -107,7 +107,9 @@ std::expected<Ptr<DeclNode>, ParseError> Parser::parseDecl(){
         current().lexeme + "'"));
 }
 
-//functionDecl ::= 'fn' IDENT '(' parameterList ')' returnType? '=' expr 
+/*
+*functionDecl ::= 'fn' IDENT '(' parameterList ')' returnType? '=' expr 
+*/
 std::expected<FuncDecl, ParseError> Parser::parseFuncDecl(){ 
     using TT = Lexer::TokenType;
     auto fnPos = currentPos();
@@ -160,7 +162,9 @@ std::expected<FuncDecl, ParseError> Parser::parseFuncDecl(){
     };
 }
 
-//typeAliasDecl ::= 'type' IDENT '=' type
+/*
+*typeAliasDecl ::= 'type' IDENT '=' type
+*/
 std::expected<TypeAliasDecl, ParseError> Parser::parseTypeAliasDecl(){ 
     using TT = Lexer::TokenType;
 
@@ -180,8 +184,10 @@ std::expected<TypeAliasDecl, ParseError> Parser::parseTypeAliasDecl(){
     return TypeAliasDecl{nameTok -> lexeme, std::move(*t), pos};
 }
 
+/*
+*moduleDecl ::= 'module' IDENT '{' declaration* '}'
+*/
 
-//moduleDecl ::= 'module' IDENT '{' declaration* '}'
 std::expected<ModuleDecl, ParseError> Parser::parseModuleDecl(){ 
     using TT = Lexer::TokenType;
 
@@ -208,9 +214,10 @@ std::expected<ModuleDecl, ParseError> Parser::parseModuleDecl(){
     return ModuleDecl{nameTok -> lexeme, std::move(decls), pos};
 }
 
-
-//dataDecl ::= 'data' IDENT typeParams? '=' consturtorDecl ('|' constructorDecl)*
-//typeParams ::= '[' IDENT (',' IDENT)* ']'
+/*
+*dataDecl ::= 'data' IDENT typeParams? '=' consturtorDecl ('|' constructorDecl)*
+*typeParams ::= '[' IDENT (',' IDENT)* ']'
+*/
 
 std::expected<DataDecl, ParseError> Parser::parseDataDecl(){ 
     using TT = Lexer::TokenType;
@@ -245,9 +252,139 @@ std::expected<DataDecl, ParseError> Parser::parseDataDecl(){
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//типы 
+//type ::= atomicType ('->' type)?
+//правоассоциативность - т.к a -> (b -> c), функция принимает 'a' и возвращает '(b -> c)'
+std::expected<Ptr<TypeNode>, ParseError> Parser::parseType(){ 
+    using TT = Lexer::TokenType;
+
+    auto pos = currentPos();
+    auto lhs = parseAtomicType(); //atomic уже возвращает указатель
+    if(!lhs) return std::unexpected(lhs.error());
+
+    if(match(TT::OP_ARROW)){ 
+        auto rhs = parseType();
+        if(!rhs) return std::unexpected(rhs.error());
+
+        FunctionTypeNode fn{std::move(*lhs), std::move(*rhs), pos};
+        return std::make_unique<TypeNode>(TypeNode{std::move(fn), pos});
+    }
+    return std::move(*lhs); //возвращаем значение вызывающему коду
+}
+
+//без FunctionTypeNode atomicType ::= builtinType | simpleType | genericType | tupleType | listType | '(' type ')' - сгруп тип (приоритет)
+std::expected<Ptr<TypeNode>, ParseError> Parser::parseAtomicType(){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    //тип список '[' type ']'/
+    if(match(TT::DELIM_LBRACKET)){ 
+        auto inner = parseType();
+        if(!inner) return std::unexpected(inner.error());
+        auto rb = expect(TT::DELIM_RBRACKET);
+        if(!rb) return std::unexpected(rb.error());
+        ListTypeNode lt{std::move(*inner), pos};
+        return std::make_unique<TypeNode>(TypeNode{std::move(lt), pos});
+    }
+
+    //кортеж и сгрупированный тип
+    if(match(TT::DELIM_LPAREN)){ 
+        auto first = parseType();
+        if(!first) return std::unexpected(first.error());
+
+        //кортеж
+        if(match(TT::DELIM_COMMA)){
+            std::vector<Ptr<TypeNode>> elems;
+            elems.push_back(std::move(*first));
+
+            auto second = parseType();
+            if(!second) return std::unexpected(second.error());
+            elems.push_back(std::move(*second));
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto el = parseType();
+                if(!el) return std::unexpected(el.error());
+                elems.push_back(std::move(*el));
+            }
+
+            auto rp = expect(TT::DELIM_RPAREN);
+            if(!rp) return std::unexpected(rp.error());
+
+            TupleTypeNode tt{std::move(elems), pos};
+            return std::make_unique<TypeNode>(TypeNode{std::move(tt), pos});
+        }
+
+        //сгрупированный тип //fn bar(f: (int64 -> bool) -> string) = ...
+        auto rp = expect(TT::DELIM_RPAREN);
+        if(!rp) return std::unexpected(rp.error());
+        return std::move(*first);
+    }
+
+    auto builtinKw = [&]() -> std::optional<std::string>{ 
+        switch(current().type){ 
+            case TT::KW_INT8: return "int8";
+            case TT::KW_INT16: return "int 16";
+            case TT::KW_INT32: return "int32";
+            case TT::KW_INT64: return "int64";
+            case TT::KW_UINT8: return "uint8";
+            case TT::KW_UINT16: return "uint 16";
+            case TT::KW_UINT32: return "uint32";
+            case TT::KW_UINT64: return "uint64";
+            case TT::KW_FLOAT32: return "float32";
+            case TT::KW_FLOAT64: return "float64";
+            case TT::KW_BOOL: return "bool";
+            case TT::KW_STRING: return "string";
+            case TT::KW_UNIT: return "nullopt";
+        }
+    }(); //чтобы builtinKw сразу стал типом
+    /* fn greet(name: string) -> unit =
+        print(name) - пример на unit*/
+
+    if(builtinKw){ 
+        advance();
+        BuiltinTypeNode bt{std::move(*builtinKw), pos};
+        return std::make_unique<TypeNode>(TypeNode{std::move(bt), pos});
+    }
+
+    //пользовательский тип: IDENT or IDENT '[' type, ...']'
+    if(check(TT::IDENT)){ 
+        std::string name = advance().lexeme; 
+
+        //generic
+        if(match(TT::DELIM_LBRACKET)){ 
+            std::vector<Ptr<TypeNode>> args;
+            auto el = parseType();
+            if(!el) return std::unexpected(el.error());
+            args.push_back(std::move(*el));
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto el = parseType();
+                if(!el) return std::unexpected(el.error());
+                args.push_back(std::move(*el));
+            }
+
+            auto rb = expect(TT::DELIM_RBRACKET);
+            if(!rb) return std::unexpected(rb.error());
+
+            GenericTypeNode gt{std::move(name), std::move(args), pos};
+            return std::make_unique<TypeNode>(TypeNode{std::move(gt), pos});
+        }
+
+        SimpleTypeNode st{std::move(name), pos};
+        return std::make_unique<TypeNode>(TypeNode{std::move(st), pos});
+    }
+
+    return std::unexpected(makeError(
+        "expected type, got '" + current().lexeme + "'"));
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные функции 
 
-//функция работы с параметрами функции
+/*
+*функция работы с параметрами функции
+*/
 //IDENT ':' type
 std::expected<FuncParam, ParseError> Parser::parseFuncParam(){ 
     using TT = Lexer::TokenType;
@@ -265,6 +402,9 @@ std::expected<FuncParam, ParseError> Parser::parseFuncParam(){
     return FuncParam{nameTok -> lexeme, std::move(*t), pos};
 }
 
+/*
+*работa с ADT
+*/
 //функция разбора параметров обобщенного типа
 std::expected<std::vector<std::string>, ParseError> Parser::parseTypeParams(){ 
     using TT = Lexer::TokenType;
