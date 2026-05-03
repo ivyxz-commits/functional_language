@@ -41,9 +41,10 @@ private:
     //взять токен ожидаемого типа, либо выдать ошибку
     std::expected<Lexer::Token, ParseError> expect(Lexer::TokenType t);
 
-    //формирование ParseError для настоящей позиции
-    ParseError makeError(std::string msg) const;
-    ParseError makeErrorAt(std::string msg, Lexer::SourcePos pos) const; 
+    //формирование ParseError
+    ParseError makeError(std::string msg) const; //В текущем месте ошибка
+    ParseError makeErrorAt(std::string msg, Lexer::SourcePos pos) const; //ошибка там, где запомнили позицию раньше
+    //допустим если необходимо сказать об ошибке в самом блоке выражения, а не текущем месте
 
     //разбор объявлений 
     std::expected<Ptr<DeclNode>, ParseError> parseDecl(); //финальный узел дерева
