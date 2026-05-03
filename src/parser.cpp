@@ -14,13 +14,14 @@ std::expected<Program, ParseError> Parser::parse(){
 
     while(!atEnd()){
         auto decl = parseDecl();
-        if(!decl) return std::unexpected(decl.error()); //просто читаем ошибку
+        if(!decl) return std::unexpected(decl.error()); //просто читаем ошибку //ссылка на объект ошибки &
         prog.decls.push_back(std::move(*decl)); //ссылка на то, что лежит в expected<>
     }
 
     return prog;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //основные функции работы с токенами
 const Lexer::Token& Parser::peek(std::size_t offset) const{ 
     std::size_t idx = m_pos + offset;
@@ -69,6 +70,42 @@ std::expected<Lexer::Token, ParseError> Parser::expect(Lexer::TokenType t){
     return std::unexpected(makeError(std::move(msg)));
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//объявления
+//declaration ::= functionDecl | typeAliasDecl | dataDecl | moduleDecl 
+std::expected<Ptr<DeclNode>, ParseError> Parser::parseDecl(){ 
+    using TT = Lexer::TokenType;
+    Pos pos = currentPos();
+
+    if(check(TT::KW_FN)){ 
+        auto r = parseFuncDecl();
+        if(!r) return std::unexpected(r.error());
+        return std::make_unique<DeclNode>(std::move(*r), pos); //cоздает указатлеь в куче и вовзращает Ptr<DeclNode>
+    }
+
+    if(check(TT::KW_TYPE)){ 
+        auto r = parseTypeAliasDecl();
+        if(!r) return std::unexpected(r.error());
+        return std::make_unique<DeclNode>(std::move(*r), pos);
+    }
+
+    if(check(TT::KW_DATA)){ 
+        auto r = parseDataDecl();
+        if(!r) return std::unexpected(r.error());
+        return std::make_unique<DeclNode>(std::move(*r), pos);
+    }
+
+    if(check(TT::KW_MODULE)){ 
+        auto r = parseModuleDecl();
+        if(!r) return std::unexpected(r.error());
+        return std::make_unique<DeclNode>(std::move(*r), pos);
+    }
+
+    //если ошибка объявления
+    return std::unexpected(makeError(
+        "expected declaration (fn / type / data / module), got '" + 
+        current().lexeme + "'"));
+}
 
 
 
