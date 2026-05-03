@@ -80,10 +80,6 @@ private:
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
     std::expected<FuncParam, ParseError> parseFuncParam();
     std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и mut
-
-    bool isTypeStart() const; //"+" и 5 - не начало типа к примеру (оператор и число)
-    static bool isBuiltinTypeName(const std::string& name); //не привязан к объекту класса
-
 };
 
 }
