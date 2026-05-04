@@ -97,7 +97,7 @@ struct LiteralPatternNode{
     Pos pos;
 };
 
-//связывает переменную
+//переменная, которая связывается со значением
 struct NamePatternNode{ 
     std::string name;
     Pos pos;
@@ -125,7 +125,7 @@ struct ConstructorPatternNode{
     Pos pos;
 };
 
-//пришло из Lisp constructor - строить
+//пришло из Lisp construct - строить
 struct ConsPatternNode{ 
     Ptr<PatternNode> head;
     Ptr<PatternNode> tail;
