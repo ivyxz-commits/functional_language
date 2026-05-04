@@ -365,6 +365,98 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parsePrimaryPattern(){
 }
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//выражения
+
+//expr ::= letExpr | ifExpr | matchExpr | lambdaExpr | logicalOr - состоит из цепочки последовательных включений других expr
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseExpr(){ 
+    using TT = Lexer::TokenType;
+
+    //4 (целые) независимые конструкции, они не могут встретиться в одном месте одновременно
+    if(check(TT::KW_LET)) return parseLetInExpr();
+    if(check(TT::KW_IF)) return parseIfExpr();
+    if(check(TT::KW_MATCH)) return parseMatchExpr();
+    if(check(TT::OP_BACKSLASH)) return parseLambdaExpr();
+
+    return parseLogicalOr();
+}
+
+//letExpr ::= 'let' bindingList 'in' expr
+//bindingList ::= binding (',' binding)*
+//binding ::= IDENT typeAnnotation? '=' expr
+//создать локальное имя внутри функции, не объявляя его
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseLetInExpr(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+    auto kw = expect(TT::KW_LET);
+    if(!kw) return std::unexpected(kw.error());
+
+    std::vector<LetBinding> bindings;
+
+    auto parseBinding = [&]() -> std::expected<LetBinding, ParseError> { 
+    
+        auto bpos = currentPos();
+        auto nameTok = expect(TT::IDENT);
+        if(!nameTok) return std::unexpected(nameTok.error());
+
+        auto typeAnnot = parseOptionalType();
+        if(!typeAnnot) return std::unexpected(typeAnnot.error());
+
+        auto eq = expect(TT::OP_ASSIGN);
+        if(!eq) return std::unexpected(eq.error());
+
+        auto value = parseExpr();
+        if(!value) return std::unexpected(value.error());
+
+        return LetBinding{std::move(nameTok -> lexeme), std::move(*typeAnnot), std::move(*value), bpos};
+    };
+
+    auto first = parseBinding();
+    if(!first) return std::unexpected(first.error());
+    bindings.push_back(std::move(*first));
+
+    while(match(TT::DELIM_COMMA)){ 
+        auto b = parseBinding();
+        if(!b) return std::unexpected(b.error());
+        bindings.push_back(std::move(*b));
+    }
+
+    auto inKw = expect(TT::KW_IN);
+    if(!inKw) return std::unexpected(inKw.error());
+
+    auto body = parseExpr();
+    if(!body) return std::unexpected(body.error());
+
+    LetInExpr le{std::move(bindings), std::move(*body), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
+}
+
+//ifExpr ::= 'if' expr 'then' expr 'else' expr
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseIfExpr(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto kw = expect(TT::KW_IF);
+    if(!kw) return std::unexpected(kw.error());
+
+    auto cond = parseExpr();
+    if(!cond) return std::unexpected(cond.error());
+
+    auto thenKw = expect(TT::KW_THEN);
+    if(!thenKw) return std::unexpected(thenKw.error());
+
+    auto thenBr = parseExpr();
+    if(!thenBr) return std::unexpected(thenBr.error());
+
+    auto elseKw = expect(TT::KW_ELSE);
+    if(!elseKw) return std::unexpected(elseKw.error());
+
+    auto elseBr = parseExpr();
+    if(!elseBr) return std::unexpected(elseBr.error());
+
+    IfExpr ie{std::move(*cond), std::move(*thenBr), std::move(*elseBr), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});   
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

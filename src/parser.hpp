@@ -99,7 +99,6 @@ private:
     std::expected<Ptr<PatternNode>, ParseError> parseListPattern();
     std::expected<Ptr<PatternNode>, ParseError> parseTupleOrGroupedPattern();
     std::expected<Ptr<PatternNode>, ParseError> parseIdentPattern();
-
     
 };
 
