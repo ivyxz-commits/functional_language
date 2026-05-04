@@ -32,6 +32,13 @@ struct SimpleTypeNode{
     Pos pos;
 };
 
+/* показательный пример - новый тип как осмысленное имя
+*type Name = string
+*data Color = Red | Green | Blue
+*fn greet(n: Name) -> unit = ...
+*fn paint(c: Color) -> unit = ...
+*/
+
 struct TupleTypeNode{ 
     std::vector<Ptr<TypeNode>> elems;
     Pos pos;

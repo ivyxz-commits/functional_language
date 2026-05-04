@@ -78,13 +78,27 @@ private:
 
     //вспомогательные функции
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
-    std::expected<FuncParam, ParseError> parseFuncParam();
     std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и mut
 
+    //для функции
+    std::expected<FuncParam, ParseError> parseFuncParam();
+
+    //для ADT - объявления
     //data name[typeParams1, typeParams2] = | None | First(type1) | Second(type2) //typeParams ::= '[' IDENT (',' IDENT)* ']'
     std::expected<std::vector<std::string>, ParseError> parseTypeParams();
     //IDENT '(' type (',' type)* ')' - разбираем один конструктор ADT
     std::expected<ConstructorDecl, ParseError> parseConstructorDecl();
+
+    //для типов
+    std::expected<Ptr<TypeNode>, ParseError> parseListType();
+    std::expected<Ptr<TypeNode>, ParseError> parseTupleOrGroupedType();
+    std::expected<Ptr<TypeNode>, ParseError> parseBuiltinType();
+    std::expected<Ptr<TypeNode>, ParseError> parseUserType();
+
+    //для шаблонов
+    std::expected<Ptr<PatternNode>, ParseError> parseListPattern();
+    std::expected<Ptr<PatternNode>, ParseError> parseTupleOrGroupedPattern();
+    std::expected<Ptr<PatternNode>, ParseError> parseIdentPattern();
 
     
 };
