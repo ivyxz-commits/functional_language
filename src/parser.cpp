@@ -458,6 +458,74 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIfExpr(){
     return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});   
 }
 
+//matchExpr ::= 'match' expr '{' matchExprArm+ '}'
+//matchExprArm ::= pattern '->' expr ','?
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseMatchExpr(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+    auto kw = expect(TT::KW_MATCH);
+    if(!kw) return std::unexpected(kw.error());
+
+    auto target = parseExpr(); //что изучаем
+    if(!target) return std::unexpected(target.error());
+
+    auto lb = expect(TT::DELIM_LBRACE);
+    if(!lb) return std::unexpected(lb.error());
+
+    std::vector<MatchArm> arms;
+    while(!check(TT::DELIM_RBRACE) && !atEnd()){ 
+        auto armPos = currentPos();
+        auto pattern = parsePattern();
+        if(!pattern) return std::unexpected(pattern.error());
+
+        auto arrow = expect(TT::OP_ARROW);
+        if(!arrow) return std::unexpected(arrow.error());
+
+        auto body = parseExpr();
+        if(!body) return std::unexpected(body.error());
+
+        arms.push_back(MatchArm{std::move(*pattern), std::move(*body), armPos});
+        match(TT::DELIM_COMMA); //запятая необязательна
+    }
+
+    if(arms.empty()){ 
+        return std::unexpected(makeError("Match expression должен иметь хотя бы одну ветвь"));
+    }
+
+    auto rb = expect(TT::DELIM_RBRACE);
+    if(!rb) return std::unexpected(rb.error());
+
+    MatchExpr me{std::move(*target), std::move(arms), pos};
+    std::make_unique<ExprNode>(ExprNode{std::move(me), pos});
+}
+
+//lambdaExpr ::= '\' IDENT+ '->' expr
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseLambdaExpr(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto bs = expect(TT::OP_BACKSLASH);
+    if(!bs) return std::unexpected(bs.error());
+
+    std::vector<std::string> params;
+    auto first = expect(TT::IDENT);
+    if(!first) return std::unexpected(first.error());
+    params.push_back(first -> lexeme);
+    
+    while(check(TT::IDENT)){ 
+        params.push_back(advance().lexeme);
+    }
+
+    auto arrow = expect(TT::OP_ARROW);
+    if(!arrow) return std::unexpected(arrow.error());
+
+    auto body = parseExpr();
+    if(!bs) return std::unexpected(bs.error());
+
+    LambdaExpr le{std::move(params), std::move(*body), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные функции 
