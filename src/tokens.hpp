@@ -64,7 +64,6 @@ enum class TokenType{
     OP_GT,
     OP_GE,
 
-
     //служебные операторы, то есть операторы для синтаксиса языка
     OP_ASSIGN,   //(назначить) let = 
     OP_ARROW,    //lyamda, match

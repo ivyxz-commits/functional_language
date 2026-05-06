@@ -355,10 +355,19 @@ struct FuncDecl{
 };
 
 
-//конструктор ADT
-struct ConstructorDecl{ 
+//data Shape = Circle{ radius: float64 } | Rect{ width: float64, height: float64 } //именованные поля
+//Задел на использование FieldAccesExpr, то есть доступа к полю
+struct FieldDecl{
     std::string name;
-    std::vector<Ptr<TypeNode>> fields; //типы полей конструктора
+    Ptr<TypeNode> type;
+    Pos pos;
+};
+
+//конструктор ADT
+struct ConstructorDecl{
+    std::string name;
+    std::vector<FieldDecl> fields; //типы полей конструктора
+    bool isNamed; //{} или ()
     Pos pos;
 };
 

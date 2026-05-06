@@ -10,7 +10,7 @@ namespace Lexer{
 Lexer::Lexer(std::string source, std::string filename) 
     : m_source(std::move(source)), m_filename(std::move(filename)) {}
 
-
+ 
 //основной метод разбиения на токены
 //декларативный подход присутствует
 std::expected<std::vector<Token>, LexError> Lexer::tokenize(){ 

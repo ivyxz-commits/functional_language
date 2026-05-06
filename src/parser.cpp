@@ -219,7 +219,8 @@ std::expected<ModuleDecl, ParseError> Parser::parseModuleDecl(){
 *typeParams ::= '[' IDENT (',' IDENT)* ']'
 */
 
-std::expected<DataDecl, ParseError> Parser::parseDataDecl(){ 
+
+std::expected<DataDecl, ParseError> Parser::parseDataDecl(){
     using TT = Lexer::TokenType;
     auto pos = currentPos();
     auto kw = expect(TT::KW_DATA);
@@ -583,28 +584,62 @@ std::expected<std::vector<std::string>, ParseError> Parser::parseTypeParams(){
 //Разбираем один конструктор ADT
 std::expected<ConstructorDecl, ParseError> Parser::parseConstructorDecl(){ 
     using TT = Lexer::TokenType;
-
     auto pos = currentPos();
+
     auto nameTok = expect(TT::IDENT);
     if (!nameTok) return std::unexpected(nameTok.error());
 
-    std::vector<Ptr<TypeNode>> fields;
-        if(match(TT::DELIM_LPAREN)){ 
-            auto ft = parseType();
-            if(!ft) return std::unexpected(ft.error());
-            fields.push_back(std::move(*ft)); //unique_ptr
+    std::vector<FieldDecl> fields;
+    bool isNamed = false;
 
-            while(match(TT::DELIM_COMMA)){ 
-                auto ft  = parseType();
-                if(!ft) return std::unexpected(ft.error());
-                fields.push_back(std::move(*ft));
-            }
-            auto rp = expect(TT::DELIM_RPAREN);
-            if(!rp) return std::unexpected(rp.error());
+    if(match(TT::DELIM_LBRACE)){ 
+        isNamed = true;
+
+        auto f = parseFieldDecl();
+        if(!f) return std::unexpected(f.error());
+        fields.push_back(std::move(*f));
+
+        while(match(TT::DELIM_COMMA)){ 
+            auto f = parseFieldDecl();
+            if(!f) return std::unexpected(f.error());
+            fields.push_back(std::move(*f));
         }
-        return ConstructorDecl{std::move(nameTok -> lexeme), std::move(fields), pos};
+
+        auto rb = expect(TT::DELIM_LBRACE);
+        if(!rb) return std::unexpected(rb.error());
+    } else if (match(TT::DELIM_LPAREN)){
+        auto ft = parseType();
+        if(!ft) return std::unexpected(ft.error());
+        fields.push_back(FieldDecl{"", std::move(*ft), pos});
+
+        while(match(TT::DELIM_COMMA)){ 
+            auto ft  = parseType();
+            if(!ft) return std::unexpected(ft.error());
+            fields.push_back(FieldDecl{"", std::move(*ft), pos});
+        }
+        auto rp = expect(TT::DELIM_RPAREN);
+        if(!rp) return std::unexpected(rp.error());
+    }
+
+        return ConstructorDecl{std::move(nameTok -> lexeme), std::move(fields), isNamed, pos};
 }
 
+//Добавляю именованные поля в конструктор () и {}
+std::expected<FieldDecl, ParseError> Parser::parseFieldDecl(){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto nameTok = expect(TT::IDENT);
+    if(!nameTok) return std::unexpected(nameTok.error());
+
+    auto colon = expect(TT::OP_COLON);
+    if(!colon) return std::unexpected(colon.error());
+
+    auto t = parseType();
+    if(!t) return std::unexpected(t.error());
+
+    FieldDecl fd{std::move(nameTok -> lexeme), std::move(*t), pos};
+}
 
 /*
 *для работы с типами

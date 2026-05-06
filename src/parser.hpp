@@ -88,6 +88,7 @@ private:
     std::expected<std::vector<std::string>, ParseError> parseTypeParams();
     //IDENT '(' type (',' type)* ')' - разбираем один конструктор ADT
     std::expected<ConstructorDecl, ParseError> parseConstructorDecl();
+      std::expected<FieldDecl, ParseError> parseFieldDecl(); //именованные поля в конструкторе () {}
 
     //для типов
     std::expected<Ptr<TypeNode>, ParseError> parseListType();
