@@ -78,7 +78,7 @@ private:
 
     //вспомогательные функции
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
-    std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и mut
+    std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let
 
     //для функции
     std::expected<FuncParam, ParseError> parseFuncParam();

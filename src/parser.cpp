@@ -719,6 +719,9 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
 
     if(check(TT::LIT_REAL)){ 
         std::string lex = advance().lexeme;
+        double value = std::strtod(lex.c_str(), nullptr);
+        RealLitExpr rle{std::move(value), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(rle), pos});
     }
 
     if(check(TT::LIT_STRING)){ 
@@ -1170,6 +1173,45 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parseIdentPattern(){
     }
     NamePatternNode np{std::move(name), pos};
     return std::make_unique<PatternNode>(PatternNode{std::move(np), pos});
+}
+
+/*
+*Для выражений
+*/
+
+std::expected<std::vector<Ptr<ExprNode>>, ParseError> Parser::parseArgList(){ //работает в связке с parsePostfix()
+    using TT = Lexer::TokenType;
+    std::vector<Ptr<ExprNode>> args;
+
+    if(!check(TT::DELIM_RPAREN)){ 
+        auto arg = parseExpr();
+        if(!arg) return std::unexpected(arg.error());
+        args.push_back(std::move(*arg));
+
+        while(match(TT::DELIM_COMMA)){ 
+            auto arg = parseExpr();
+            if(!arg) return std::unexpected(arg.error());
+            args.push_back(std::move(*arg));
+        }
+    }
+
+    return args;
+}
+
+
+
+
+std::expected<std::optional<Ptr<TypeNode>>, ParseError> Parser::parseOptionalType(){ //для let
+    using TT = Lexer::TokenType;
+
+    if(!match(TT::OP_COLON)){ 
+        return std::optional<Ptr<TypeNode>>{std::nullopt};
+    }
+
+    auto t = parseType();
+    if(!t) return std::unexpected(t.error());
+
+    return std::optional<Ptr<TypeNode>>{std::move(*t)};
 }
 
 }
