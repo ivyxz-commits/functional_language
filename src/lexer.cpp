@@ -187,14 +187,16 @@ std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){
         if(hasExp){ 
             isReal = true;
             lexeme += advance ();
-        }
 
-        if(!atEnd() && (peek() == '+' || peek() == '-')){ 
-            lexeme += advance();
-        }
+            if(!atEnd() && (peek() == '+' || peek() == '-')){ 
+                lexeme += advance();
+            }
 
-        while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
-            lexeme += advance();
+            while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
+                lexeme += advance();
+            }
+        } else { 
+            return std::unexpected(LexError{"invalid exponent in numerical literal", currentPos()});
         }
     }
 
