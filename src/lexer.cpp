@@ -156,7 +156,8 @@ std::expected<Token, LexError> Lexer::nextToken(){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Детальное разбиение некоторых "особых" случаев
-// Числовой литерал: INT ::= DIGIT+   REAL ::= DIGIT+ '.' DIGIT+
+// Числовой литерал: INT ::= DIGIT+   REAL ::= DIGIT+ '.' DIGIT+ 
+//либо REAL ::= DIGIT+ '.' DIGIT+ (('e' | 'E') ('+' | '-')? DIGIT+)? | DIGIT+ ('e' | 'E') ('+' | '-')? DIGIT+
 //ВАЖНО ПОМНИТЬ! мы уже взяли символ c, поэтому его нужно будет взять в этом случае
 std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){ 
     //std::string(size_t count, char ch); - конструктор string такого плана
@@ -167,16 +168,40 @@ std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){
         lexeme += advance();
     }
 
+    bool isReal = false;
+
     // это вещественная часть?
     if(!atEnd() && peek() == '.' && std::isdigit(static_cast<unsigned char>(peek(1)))) {
+        isReal = true;
         lexeme += advance(); //'.'
         while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
             lexeme += advance();
         }
-        return Token{TokenType::LIT_REAL, std::move(lexeme), start};
     }
 
-    return Token{TokenType::LIT_INT, std::move(lexeme), start};
+    if(!atEnd() && (peek() == 'e' || peek() == 'E')){ 
+        char next1 = peek(1); char next2 = peek(2);
+        bool hasExp = std::isdigit(static_cast<unsigned char>(next1)) || 
+        ((next1 == '+' || next1 == '-') && std::isdigit(static_cast<unsigned char>(next2)));
+
+        if(hasExp){ 
+            isReal = true;
+            lexeme += advance ();
+        }
+
+        if(!atEnd() && (peek() == '+' || peek() == '-')){ 
+            lexeme += advance();
+        }
+
+        while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
+            lexeme += advance();
+        }
+    }
+
+    if(isReal){ 
+        return Token{TokenType::LIT_REAL, std::move(lexeme), start};
+    }
+    return Token{TokenType::LIT_INT, std::move(lexeme), start};    
 }
 
 
@@ -203,18 +228,17 @@ std::expected<Token, LexError> Lexer::scanString(SourcePos start){
             char esc = advance();
             switch(esc){ 
                 case 'n': lexeme += '\n'; break;
-                case 't': lexeme += '\t'; break;
-                case 'r': lexeme += '\r'; break;
                 case '\\': lexeme += '\\'; break;
+                case '"':  lexeme += '"';  break;
                 default: 
                     return std::unexpected(LexError{ 
-                        std::string("invalid escape sequence '\\'") + esc + "'", start
+                        std::string("invalid escape sequence '\\") + esc + "'", start
                     });
             }
             continue;
         }
 
-        //опционально: в будущем добавем русский язык
+        //опционально: в будущем добавим русский язык
 
         //поэтому пока проверка на не ASCII символ
         if(static_cast<unsigned char>(c) > 127){ 
