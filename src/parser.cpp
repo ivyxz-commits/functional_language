@@ -647,6 +647,183 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMultiplicative(){
     return std::move(*lhs);
 }
 
+//unary ::=('-' | 'not') unary | postfix
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseUnary(){ 
+    using TT = Lexer::TokenType;
+    if(check(TT::OP_MINUS)){ 
+        auto pos = currentPos();
+        advance();
+        auto operand = parseUnary();
+        if(!operand) return std::unexpected(operand.error());
+        UnaryExpr ue{"-", std::move(*operand), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
+    } else if (check(TT::KW_NOT)){ 
+        auto pos = currentPos();
+        advance();
+        auto operand = parseUnary();
+        if(!operand) return std::unexpected(operand.error());
+        UnaryExpr ue{"not", std::move(*operand), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
+        
+    }
+    return parsePostfix();
+}
+
+
+//postfix ::primary postfixOp* // postfixOp ::= callOp | fieldOp
+//callOp ::= '(' argumentList? ')' //fieldOp ::= '.' IDENT
+std::expected<Ptr<ExprNode>, ParseError> Parser::parsePostfix(){ 
+    using TT = Lexer::TokenType;
+    auto expr = parsePrimary();
+    if(!expr) return std::unexpected(expr.error());
+
+    while(true){
+
+        if(check(TT::DELIM_LPAREN)){
+            auto pos = currentPos();
+            advance();
+            auto args = parseArgList();
+            if(!args) return std::unexpected(args.error());
+            auto rp  = expect(TT::DELIM_LPAREN);
+            if(!rp) return std::unexpected(rp.error());
+
+            CallExpr ce{std::move(*expr), std::move(*args), pos};
+            *expr = std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
+        } else if (check(TT::OP_DOT)){
+            auto pos = currentPos();
+            advance();
+            auto field = expect(TT::IDENT);
+            if(!field) return std::unexpected(field.error());
+
+            FieldAccessExpr fae{std::move(*expr), std::move(field -> lexeme), pos};
+            *expr = std::make_unique<ExprNode>(ExprNode{std::move(fae), pos});
+        } else { 
+            break;
+        }
+    }
+    return std::move(*expr);
+}
+
+//primary ::= literal | IDENT | groupedExpr | tupleExpr | ListExpr | constructorExpr
+std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    if(check(TT::LIT_INT)){ 
+        std::string lex = advance().lexeme;
+        long long value = 0;
+        for(char ch : lex) value = value * 10 + (ch - '0');
+        IntLitExpr ile{std::move(value), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ile), pos});
+    }
+
+    if(check(TT::LIT_REAL)){ 
+        std::string lex = advance().lexeme;
+    }
+
+    if(check(TT::LIT_STRING)){ 
+        std::string value = advance().lexeme;
+        StringLitExpr sle{std::move(value), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(sle), pos});
+    }
+
+    if(match(TT::LIT_YEP)){
+        BoolLitExpr ble{true, pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ble), pos});
+    }
+
+    if(match(TT::LIT_NOPE)){
+        BoolLitExpr ble{false, pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ble), pos});
+    }
+
+    if(match(TT::KW_UNIT)){ 
+        UnitLitExpr ule{pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ule), pos});
+    }
+
+    //список '[' (expr (',' expr)*)? ']'
+    if(match(TT::DELIM_LBRACKET)){ 
+        std::vector<Ptr<ExprNode>> elems;
+        if(!check(TT::DELIM_LBRACKET)){ 
+            auto el = parseExpr();
+            if(!el) return std::unexpected(el.error());
+            elems.push_back(std::move(*el));
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto el = parseExpr();
+                if(!el) return std::unexpected(el.error());
+                elems.push_back(std::move(*el));
+            }
+        }
+        auto rb = expect(TT::DELIM_RBRACKET);
+        if(!rb) return std::unexpected(rb.error());
+        ListExpr le{std::move(elems), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
+    } 
+
+    //кортеж или сгрупированное выражение '(' expr (',' expr)* ')'
+    if(match(TT::DELIM_LPAREN)){ 
+        auto first = parseExpr();
+        if(!first) return std::unexpected(first.error());
+        
+        if(match(TT::DELIM_COMMA)){ 
+            std::vector<Ptr<ExprNode>> elems;
+            elems.push_back(std::move(*first));
+
+            auto second = parseExpr();
+            if(!second) return std::unexpected(second.error());
+            elems.push_back(std::move(*second));
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto el = parseExpr();
+                if(!el) return std::unexpected(el.error());
+                elems.push_back(std::move(*el));
+            }
+
+            auto rp = expect(TT::DELIM_LPAREN);
+            if(!rp) return std::unexpected(rp.error());
+
+            TupleExpr te{std::move(elems), pos};
+            return std::make_unique<ExprNode>(ExprNode{std::move(te), pos});
+        }
+
+        auto rp = expect(TT::DELIM_LPAREN);
+        if(!rp) return std::unexpected(rp.error());
+        return std::move(*first); //(a + b) * z
+    }
+
+    //Идентификатор, конструктор или вызов встроенной функции
+    if(check(TT::IDENT)){ 
+        std::string name = advance().lexeme;
+
+        bool isConstructor = !name.empty() && std::isupper(static_cast<unsigned char>(name[0]));
+        if(isConstructor){ 
+            std::vector<Ptr<ExprNode>> args;
+            if(match(TT::DELIM_LPAREN)){ 
+                auto arg = parseExpr();
+                if(!arg) return std::unexpected(arg.error());
+                args.push_back(std::move(*arg));
+
+                while(match(TT::DELIM_COMMA)){ 
+                    auto arg = parseExpr();
+                    if(!arg) return std::unexpected(arg.error());
+                    args.push_back(std::move(*arg));
+                }
+                auto rp = expect(TT::DELIM_LPAREN);
+                if(!rp) return std::unexpected(rp.error());
+            }
+            ConstructorExpr ce{std::move(name), std::move(args), pos};
+            return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
+        }
+
+        IdentExpr ie{std::move(name), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});
+    }
+
+    return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные функции 
