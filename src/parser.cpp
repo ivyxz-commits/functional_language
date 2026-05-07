@@ -527,6 +527,126 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseLambdaExpr(){
     return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
 }
 
+//последняя конструкция в которую рекурсивно входят другие (от наименьшего к наибольшему приоритету)
+//logicalOr ::= logicalAnd ('or' logicalAnd)*
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseLogicalOr(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseLogicalAnd();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::KW_OR)){ 
+        auto pos = currentPos(); //позиция or для BinaryExpr
+        advance();
+        auto rhs = parseLogicalAnd();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{"or", std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos}); //(a or b) or c
+    }
+    return std::move(*lhs);
+}
+
+//logicalAnd ::= equality ('and' equality)*
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseLogicalAnd(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseEquality();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::KW_AND)){ 
+        auto pos = currentPos();
+        advance();
+        auto rhs = parseEquality();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{"and", std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
+    }
+    return std::move(*lhs);
+}
+
+//equality ::= comparison (('==' | '!=') comparison)* - 0 <= 5 == 1
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseEquality(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseComparison();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::OP_EQ) || check(TT::OP_NEQ)){ 
+        auto pos = currentPos();
+        std::string op = (current().type == TT::OP_EQ) ? "==" : "!=";
+        advance();
+        auto rhs = parseComparison();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{op, std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
+    }
+    return std::move(*lhs);
+}
+
+//comparison ::= additive(('<') | ('>') | '<=' | '>=') additive)*
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseComparison(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseAdditive();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::OP_LT) || check(TT::OP_LE) || check(TT::OP_GT) || check(TT::OP_GE)){ 
+        auto pos = currentPos();
+        std::string op;
+        switch (current().type){ 
+            case TT::OP_LT : op = "<"; break;
+            case TT::OP_LE : op = "<="; break;
+            case TT::OP_GT : op = ">="; break;
+            case TT::OP_GE : op = ">"; break;
+            default: break;
+        }
+        advance();
+        auto rhs = parseAdditive();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{op, std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
+    }
+    return std::move(*lhs);
+}
+
+//additive ::= multiplicative(('+' | '-') multiplicative)*
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseAdditive(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseMultiplicative();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::OP_PLUS) || check(TT::OP_MINUS)){ 
+        auto pos = currentPos();
+        std::string op = (current().type == TT::OP_PLUS) ? "+" : "-";
+        advance();
+        auto rhs = parseMultiplicative();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{op, std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
+    }
+    return std::move(*lhs);
+}
+
+//additive ::= unary (('*' | '/' | '%') unary)*
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseMultiplicative(){ 
+    using TT = Lexer::TokenType;
+    auto lhs = parseUnary();
+    if(!lhs) return std::unexpected(lhs.error());
+
+    while(check(TT::OP_STAR) || check(TT::OP_SLASH) || check(TT::OP_PERCENT)){ 
+        auto pos = currentPos();
+        std::string op;
+        switch(current().type){ 
+            case TT::OP_STAR : op = "*"; break;
+            case TT::OP_SLASH: op = "/"; break;
+            case TT::OP_PERCENT: op = "%"; break;
+            default: break;
+        }
+        advance();
+        auto rhs = parseUnary();
+        if(!rhs) return std::unexpected(rhs.error());
+        BinaryExpr bin{op, std::move(*lhs), std::move(*rhs), pos};
+        *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
+    }
+    return std::move(*lhs);
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные функции 
