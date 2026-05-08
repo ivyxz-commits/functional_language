@@ -77,8 +77,13 @@ private:
     std::expected<Ptr<ExprNode>, ParseError> parsePrimary();
 
     //вспомогательные функции
+    std::expected<LetBinding, ParseError> parseLetBinding();
+    std::expected<MatchArm, ParseError> parseMatchArm();
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
     std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let
+    std::expected<Ptr<ExprNode>, ParseError> parseListExpr();
+    std::expected<Ptr<ExprNode>, ParseError> parseTupleOrGroupedExpr(); 
+    std::expected<Ptr<ExprNode>, ParseError> parseIdentOrConstructorExpr();
 
     //для функции
     std::expected<FuncParam, ParseError> parseFuncParam();

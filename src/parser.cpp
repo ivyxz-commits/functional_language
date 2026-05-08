@@ -394,30 +394,12 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseLetInExpr(){
 
     std::vector<LetBinding> bindings;
 
-    auto parseBinding = [&]() -> std::expected<LetBinding, ParseError> { 
-    
-        auto bpos = currentPos();
-        auto nameTok = expect(TT::IDENT);
-        if(!nameTok) return std::unexpected(nameTok.error());
-
-        auto typeAnnot = parseOptionalType();
-        if(!typeAnnot) return std::unexpected(typeAnnot.error());
-
-        auto eq = expect(TT::OP_ASSIGN);
-        if(!eq) return std::unexpected(eq.error());
-
-        auto value = parseExpr();
-        if(!value) return std::unexpected(value.error());
-
-        return LetBinding{std::move(nameTok -> lexeme), std::move(*typeAnnot), std::move(*value), bpos};
-    };
-
-    auto first = parseBinding();
+    auto first = parseLetBinding();
     if(!first) return std::unexpected(first.error());
     bindings.push_back(std::move(*first));
 
     while(match(TT::DELIM_COMMA)){ 
-        auto b = parseBinding();
+        auto b = parseLetBinding();
         if(!b) return std::unexpected(b.error());
         bindings.push_back(std::move(*b));
     }
@@ -475,22 +457,13 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMatchExpr(){
 
     std::vector<MatchArm> arms;
     while(!check(TT::DELIM_RBRACE) && !atEnd()){ 
-        auto armPos = currentPos();
-        auto pattern = parsePattern();
-        if(!pattern) return std::unexpected(pattern.error());
-
-        auto arrow = expect(TT::OP_ARROW);
-        if(!arrow) return std::unexpected(arrow.error());
-
-        auto body = parseExpr();
-        if(!body) return std::unexpected(body.error());
-
-        arms.push_back(MatchArm{std::move(*pattern), std::move(*body), armPos});
-        match(TT::DELIM_COMMA); //запятая необязательна
+        auto arm = parseMatchArm();
+        if(!arm) return std::unexpected(arm.error());
+        arms.push_back(std::move(*arm));
     }
 
     if(arms.empty()){ 
-        return std::unexpected(makeError("Match expression должен иметь хотя бы одну ветвь"));
+        return std::unexpected(makeError("Match expression must have at least one branch"));
     }
 
     auto rb = expect(TT::DELIM_RBRACE);
@@ -745,84 +718,9 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
         return std::make_unique<ExprNode>(ExprNode{std::move(ule), pos});
     }
 
-    //список '[' (expr (',' expr)*)? ']'
-    if(match(TT::DELIM_LBRACKET)){ 
-        std::vector<Ptr<ExprNode>> elems;
-        if(!check(TT::DELIM_LBRACKET)){ 
-            auto el = parseExpr();
-            if(!el) return std::unexpected(el.error());
-            elems.push_back(std::move(*el));
-
-            while(match(TT::DELIM_COMMA)){ 
-                auto el = parseExpr();
-                if(!el) return std::unexpected(el.error());
-                elems.push_back(std::move(*el));
-            }
-        }
-        auto rb = expect(TT::DELIM_RBRACKET);
-        if(!rb) return std::unexpected(rb.error());
-        ListExpr le{std::move(elems), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
-    } 
-
-    //кортеж или сгрупированное выражение '(' expr (',' expr)* ')'
-    if(match(TT::DELIM_LPAREN)){ 
-        auto first = parseExpr();
-        if(!first) return std::unexpected(first.error());
-        
-        if(match(TT::DELIM_COMMA)){ 
-            std::vector<Ptr<ExprNode>> elems;
-            elems.push_back(std::move(*first));
-
-            auto second = parseExpr();
-            if(!second) return std::unexpected(second.error());
-            elems.push_back(std::move(*second));
-
-            while(match(TT::DELIM_COMMA)){ 
-                auto el = parseExpr();
-                if(!el) return std::unexpected(el.error());
-                elems.push_back(std::move(*el));
-            }
-
-            auto rp = expect(TT::DELIM_LPAREN);
-            if(!rp) return std::unexpected(rp.error());
-
-            TupleExpr te{std::move(elems), pos};
-            return std::make_unique<ExprNode>(ExprNode{std::move(te), pos});
-        }
-
-        auto rp = expect(TT::DELIM_LPAREN);
-        if(!rp) return std::unexpected(rp.error());
-        return std::move(*first); //(a + b) * z
-    }
-
-    //Идентификатор, конструктор или вызов встроенной функции
-    if(check(TT::IDENT)){ 
-        std::string name = advance().lexeme;
-
-        bool isConstructor = !name.empty() && std::isupper(static_cast<unsigned char>(name[0]));
-        if(isConstructor){ 
-            std::vector<Ptr<ExprNode>> args;
-            if(match(TT::DELIM_LPAREN)){ 
-                auto arg = parseExpr();
-                if(!arg) return std::unexpected(arg.error());
-                args.push_back(std::move(*arg));
-
-                while(match(TT::DELIM_COMMA)){ 
-                    auto arg = parseExpr();
-                    if(!arg) return std::unexpected(arg.error());
-                    args.push_back(std::move(*arg));
-                }
-                auto rp = expect(TT::DELIM_LPAREN);
-                if(!rp) return std::unexpected(rp.error());
-            }
-            ConstructorExpr ce{std::move(name), std::move(args), pos};
-            return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
-        }
-
-        IdentExpr ie{std::move(name), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});
-    }
+    if(check(TT::DELIM_LBRACKET)) return parseListExpr();
+    if(check(TT::DELIM_LPAREN)) return parseTupleOrGroupedExpr();
+    if(check(TT::IDENT)) parseIdentOrConstructorExpr();
 
     return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
 }
@@ -1198,10 +1096,8 @@ std::expected<std::vector<Ptr<ExprNode>>, ParseError> Parser::parseArgList(){ //
     return args;
 }
 
-
-
-
 std::expected<std::optional<Ptr<TypeNode>>, ParseError> Parser::parseOptionalType(){ //для let
+
     using TT = Lexer::TokenType;
 
     if(!match(TT::OP_COLON)){ 
@@ -1212,6 +1108,141 @@ std::expected<std::optional<Ptr<TypeNode>>, ParseError> Parser::parseOptionalTyp
     if(!t) return std::unexpected(t.error());
 
     return std::optional<Ptr<TypeNode>>{std::move(*t)};
+}
+
+std::expected<LetBinding, ParseError> Parser::parseLetBinding(){ //имена и их типы
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto nameTok = expect(TT::IDENT);
+    if(!nameTok) return std::unexpected(nameTok.error());
+
+    auto typeAnnot = parseOptionalType();
+    if(!typeAnnot) return std::unexpected(typeAnnot.error());
+
+    auto eq = expect(TT::OP_ASSIGN);
+    if(!eq) return std::unexpected(eq.error());
+
+    auto value = parseExpr();
+    if(!value) return std::unexpected(value.error());
+
+    return LetBinding{std::move(nameTok -> lexeme), std::move(*typeAnnot), std::move(*value), pos};
+}
+
+std::expected<MatchArm, ParseError> Parser::parseMatchArm(){ //matchExprArm ::= pattern '->' expr ','?
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto pattern = parsePattern();
+    if(!pattern) return std::unexpected(pattern.error());
+
+    auto arrow = expect(TT::OP_ARROW);
+    if(!arrow) return std::unexpected(arrow.error());
+
+    auto body = parseExpr();
+    if(!body) return std::unexpected(body.error());
+
+    match(TT::DELIM_COMMA); //запятая необязательна
+
+    return MatchArm{std::move(*pattern), std::move(*body), pos};
+}
+
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseListExpr(){ //список '[' (expr (',' expr)*)? ']'
+    
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto rb = expect(TT::DELIM_LBRACKET);
+    if(!rb) return std::unexpected(rb.error());
+
+    std::vector<Ptr<ExprNode>> elems;
+    
+    if(!check(TT::DELIM_RBRACKET)){ 
+        auto el = parseExpr();
+        if(!el) return std::unexpected(el.error());
+        elems.push_back(std::move(*el));
+
+        while(match(TT::DELIM_COMMA)){ 
+            auto el = parseExpr();
+            if(!el) return std::unexpected(el.error());
+            elems.push_back(std::move(*el));
+        }
+    }
+
+    auto rb = expect(TT::DELIM_RBRACKET);
+    if(!rb) return std::unexpected(rb.error());
+    
+    ListExpr le{std::move(elems), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(le), pos}); 
+}
+
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseTupleOrGroupedExpr(){ //кортеж или сгрупированное выражение '(' expr (',' expr)* ')'
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto lp = expect(TT::DELIM_LPAREN);
+    if(!lp) return std::unexpected(lp.error());
+
+    auto first = parseExpr();
+    if(!first) return std::unexpected(first.error());
+    
+    if(match(TT::DELIM_COMMA)){ 
+        //кортеж
+        std::vector<Ptr<ExprNode>> elems;
+        elems.push_back(std::move(*first));
+
+        auto second = parseExpr();
+        if(!second) return std::unexpected(second.error());
+        elems.push_back(std::move(*second));
+
+        while(match(TT::DELIM_COMMA)){ 
+            auto el = parseExpr();
+            if(!el) return std::unexpected(el.error());
+            elems.push_back(std::move(*el));
+        }
+
+        auto rp = expect(TT::DELIM_LPAREN);
+        if(!rp) return std::unexpected(rp.error());
+
+        TupleExpr te{std::move(elems), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(te), pos});
+    }
+
+    auto rp = expect(TT::DELIM_LPAREN);
+    if(!rp) return std::unexpected(rp.error());
+    return std::move(*first); //(a + b) * z
+}
+
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto nameTok = expect(TT::IDENT);
+    if(!nameTok) return std::unexpected(nameTok.error());
+    std::string name = nameTok->lexeme;
+
+    bool isConstructor = !name.empty() && std::isupper(static_cast<unsigned char>(name[0]));
+    if(isConstructor){ 
+        std::vector<Ptr<ExprNode>> args;
+        if(match(TT::DELIM_LPAREN)){ 
+            auto arg = parseExpr();
+            if(!arg) return std::unexpected(arg.error());
+            args.push_back(std::move(*arg));
+
+            while(match(TT::DELIM_COMMA)){ 
+                auto arg = parseExpr();
+                if(!arg) return std::unexpected(arg.error());
+                args.push_back(std::move(*arg));
+            }
+            auto rp = expect(TT::DELIM_LPAREN);
+            if(!rp) return std::unexpected(rp.error());
+        }
+        ConstructorExpr ce{std::move(name), std::move(args), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
+    }
+
+    IdentExpr ie{std::move(name), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});
 }
 
 }
