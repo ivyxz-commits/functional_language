@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include <unordered_map>
 
 namespace Semantic{ 
 
@@ -8,7 +9,7 @@ using Pos = Lexer::SourcePos;
 using namespace Parser;
 
 template<typename T>
-using Ptr = std::unique_ptr<T>
+using sPtr = std::shared_ptr<T>;
 
 
 struct SemanticError{ 
@@ -37,20 +38,20 @@ struct SimpleType{
 
 struct GenericType{ 
     std::string name;
-    std::vector<Ptr<TypeInfo>> args;
+    std::vector<sPtr<TypeInfo>> args;
 };
 
 struct TupleType{ 
-    std::vector<Ptr<TypeInfo>> elems;
+    std::vector<sPtr<TypeInfo>> elems;
 };
 
 struct ListType{ 
-    Ptr<TypeInfo> elem;
+    sPtr<TypeInfo> elem;
 };
 
 struct FunctionType{ 
-    Ptr<TypeInfo> from;
-    Ptr<TypeInfo> to;
+    sPtr<TypeInfo> from;
+    sPtr<TypeInfo> to;
 };
 
 using TypeInfoVar = std::variant<
@@ -72,10 +73,113 @@ struct TypeInfo{
 
 
 //добавим удобные конструкторы для создания TypeInfo
+sPtr<TypeInfo> makeBiultin(const std::string& name);
+sPtr<TypeInfo> makeSimle(const std::string& name);
+sPtr<TypeInfo> makeList(sPtr<TypeInfo> elem);
+sPtr<TypeInfo> makeTuple(std::vector<sPtr<TypeInfo>> elems);
+sPtr<TypeInfo> makeFunction(sPtr<TypeInfo> from, sPtr<TypeInfo> to);
+sPtr<TypeInfo> makeGeneric(const std::string& name, std::vector<sPtr<TypeInfo>> args);
 
-Ptr<TypeInfo> makeBiultin(const std::string& name);
-Ptr<TypeInfo> makeSimle(const std::string& name);
-Ptr<TypeInfo> makeList(Ptr<TypeInfo> elem);
-Ptr<TypeInfo> makeTuple(std::vector<Ptr<TypeInfo>> elems);
-Ptr<TypeInfo> makeFunction(Ptr<TypeInfo> from, Ptr<TypeInfo> to);
-Ptr<TypeInfo> makeGeneric(const std::string& name, std::vector<Ptr<TypeInfo>> args);
+//информация о конструкторе
+//data Shape = Circle{ radius: float64 } | Rect{ width: float64, height: float64 }
+struct ConstructorInfo{
+    std::string name; //Circle
+    std::string dataName; //Shape = dataName
+    std::vector<sPtr<TypeInfo>> fieldTypes; //BuiltinType("float64");
+    bool isNamed; //() or {} //true
+    std::vector<std::string> fieldNames; //для именованных полей //radius
+};
+
+//data Result[a, e] = Ok(a) | Error(e)
+struct DataTypeInfo{
+    std::string name; //Result
+    std::vector<std::string> typeParams; 
+    std::vector<ConstructorInfo> constructors;
+};
+
+
+//таблица символов - что стоит за каждым именем
+struct Symbol{ 
+    std::string name;
+    sPtr<TypeInfo> type;
+    bool isMutable = false; //true - на случай добавления mut
+    Pos declPos;
+};
+
+
+//окружение (область видимости)
+//будет хранить таблицу символов и указатель на родительское окружение
+class Environment{ 
+public:
+    Environment(sPtr<Environment> parent = nullptr);
+
+    bool define(const std::string& name, Symbol sym);
+    std::optional<Symbol> lookup(const std::string& name) const; //для вложенностей
+    std::optional<Symbol> lookupLocal(const std::string& name) const; //для проверки повторного объявления
+
+private:
+    std::unordered_map<std::string, Symbol> m_symbols; //словарь, как ключ значение
+    sPtr<Environment> m_parent; //каждая область видимости на родительскую область, которая тоже Environment
+};
+
+//справочник типов(ADT, Alliases) - хранилище - получение информации о типах данных
+class TypeRegistry{
+public:
+    //зарегестрировать ADT
+    bool registerData(DataTypeInfo info);
+    bool registerAlias(const std::string& name, sPtr<TypeInfo> type);
+
+    //найти ADT по имени
+    std::optional<DataTypeInfo> lookupData(const std::string& name) const;
+    std::optional<ConstructorInfo> lookupConstructor (const std::string& name) const;
+    std::optional<Ptr<TypeInfo>> lookupAlias(const std::string& name) const;
+
+    sPtr<TypeInfo> resolveAlias(sPtr<TypeInfo> type) const;
+    /*на случай: //FullName -> Name -> string
+    *type Name = string
+    *type FullName = Name
+    */
+private:
+    std::unordered_map<std::string, DataTypeInfo> m_DataTypes;
+    std::unordered_map<std::string, ConstructorInfo> m_constructors;
+    std::unordered_map<std::string, sPtr<TypeInfo>> m_aliases;
+};
+
+//сам семантический анализатор
+class Analyzer{ 
+public: 
+    Analyzer(std::string filename = "<input>");
+    std::vector<SemanticError> analyze(const Program& prog); //если вектор пустой, то все прекрасно с семантической точки зрения
+
+private:
+    std::string m_filename;
+    TypeRegistry m_registry; //объект реестра типов
+
+    //вспомогательная - создание ошибки
+    SemanticError makeError(std::string msg, Pos pos) const;
+
+    //разбор объявлений
+    void analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>&errors);
+    void analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors);
+
+    //разбор образцов(шаблонов)
+    bool analyzePattern(
+        const PatternNode& pattern, //constructorPatternNode
+        sPtr<TypeInfo> expectedType, //SimpleType("Option[int64]")
+        sPtr<Environment> env,
+        std::vector<SemanticError>& errors);
+
+    //data Option[a] = None | Some(a)
+    /* fn smth(x: Option[int64]) -> int64 =
+        match x {
+            None -> 0,
+            Some(v) -> v + 1
+    } */
+
+    
+};
+
+}
