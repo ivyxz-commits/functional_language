@@ -275,9 +275,14 @@ struct LetInExpr{
   None    -> 0
 } in result + 1 */
 
+struct LambdaParam{ 
+    std::string name;
+    std::optional<Ptr<TypeNode>> type;
+    Pos pos; 
+};
 
 struct LambdaExpr{ 
-    std::vector<std::string> params;
+    std::vector<LambdaParam> params;
     Ptr<ExprNode> body;
     Pos pos;
 };

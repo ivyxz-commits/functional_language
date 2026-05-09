@@ -240,7 +240,7 @@ std::expected<ConstructorDecl, ParseError> Parser::parseConstructorDecl(){
             fields.push_back(std::move(*f));
         }
 
-        auto rb = expect(TT::DELIM_LBRACE);
+        auto rb = expect(TT::DELIM_RBRACE);
         if(!rb) return std::unexpected(rb.error());
     } else if (match(TT::DELIM_LPAREN)){
         auto ft = parseType();
@@ -273,7 +273,7 @@ std::expected<FieldDecl, ParseError> Parser::parseFieldDecl(){
     auto t = parseType();
     if(!t) return std::unexpected(t.error());
 
-    FieldDecl fd{std::move(nameTok -> lexeme), std::move(*t), pos};
+    return FieldDecl{std::move(nameTok -> lexeme), std::move(*t), pos};
 }
 
 

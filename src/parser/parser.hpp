@@ -80,6 +80,7 @@ private:
     //для выражений
     std::expected<LetBinding, ParseError> parseLetBinding();
     std::expected<MatchArm, ParseError> parseMatchArm();
+    std::expected<LambdaParam, ParseError> parseLambdaParam();
     std::expected<std::vector<Ptr<ExprNode>>, ParseError> parseArgList(); //работает в связке с parsePostfix()
     std::expected<std::optional<Ptr<TypeNode>>, ParseError> parseOptionalType(); //для let и в будущем, возможно, mut
     std::expected<Ptr<ExprNode>, ParseError> parseListExpr();

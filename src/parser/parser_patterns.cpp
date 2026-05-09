@@ -17,6 +17,8 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parsePattern(){
         ConsPatternNode cn{std::move(*lhs), std::move(*rhs), pos};
         return std::make_unique<PatternNode>(PatternNode{std::move(cn), pos});
     }
+
+    return std::move(*lhs);
 }
 
 std::expected<Ptr<PatternNode>, ParseError> Parser::parsePrimaryPattern(){ 
@@ -32,31 +34,31 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parsePrimaryPattern(){
     //булевые литералы
     if(match(TT::LIT_YEP)){ 
         LiteralPatternNode lp{"yep", LiteralPatternNode::Kind::Bool, pos};
-        std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
     }
     if(match(TT::LIT_NOPE)){ 
         LiteralPatternNode lp{"nope", LiteralPatternNode::Kind::Bool, pos};
-        std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
     }
 
     //целый литерал
     if(check(TT::LIT_INT)){ 
         std::string value = advance().lexeme;
         LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Int, pos};
-        std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
     }
 
     if(check(TT::LIT_REAL)){ 
         std::string value = advance().lexeme;
         LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Real, pos};
-        std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
     }
 
     //строковый
     if(check(TT::LIT_STRING)){ 
         std::string value = advance().lexeme;
         LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::String, pos};
-        std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
     }
 
     //отрицательный числовой литерал - INT or REAL
@@ -69,7 +71,7 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parsePrimaryPattern(){
             return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
         } else { 
             std::string value = "-" + advance().lexeme;
-            LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Int, pos};
+            LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Real, pos};
             return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
         }
     }

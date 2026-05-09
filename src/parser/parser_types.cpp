@@ -140,7 +140,7 @@ std::expected<Ptr<TypeNode>, ParseError> Parser::parseUserType(){
     auto pos = currentPos();
 
     auto nameTok = expect(TT::IDENT);
-    if(!nameTok) std::unexpected(nameTok.error());
+    if(!nameTok) return std::unexpected(nameTok.error());
     
     //generic
     if(match(TT::DELIM_LBRACKET)){ 

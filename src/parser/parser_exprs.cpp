@@ -105,7 +105,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMatchExpr(){
     if(!rb) return std::unexpected(rb.error());
 
     MatchExpr me{std::move(*target), std::move(arms), pos};
-    std::make_unique<ExprNode>(ExprNode{std::move(me), pos});
+    return std::make_unique<ExprNode>(ExprNode{std::move(me), pos});
 }
 
 //lambdaExpr ::= '\' IDENT+ '->' expr
@@ -116,20 +116,22 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseLambdaExpr(){
     auto bs = expect(TT::OP_BACKSLASH);
     if(!bs) return std::unexpected(bs.error());
 
-    std::vector<std::string> params;
-    auto first = expect(TT::IDENT);
+    std::vector<LambdaParam> params;
+    auto first = parseLambdaParam();
     if(!first) return std::unexpected(first.error());
-    params.push_back(first -> lexeme);
+    params.push_back(std::move(*first));
     
     while(check(TT::IDENT)){ 
-        params.push_back(advance().lexeme);
+        auto param = parseLambdaParam();
+        if(!param) return std::unexpected(param.error());
+        params.push_back(std::move(*param));
     }
 
     auto arrow = expect(TT::OP_ARROW);
     if(!arrow) return std::unexpected(arrow.error());
 
     auto body = parseExpr();
-    if(!bs) return std::unexpected(bs.error());
+    if(!body) return std::unexpected(body.error());
 
     LambdaExpr le{std::move(params), std::move(*body), pos};
     return std::make_unique<ExprNode>(ExprNode{std::move(le), pos});
@@ -200,8 +202,8 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseComparison(){
         switch (current().type){ 
             case TT::OP_LT : op = "<"; break;
             case TT::OP_LE : op = "<="; break;
-            case TT::OP_GT : op = ">="; break;
-            case TT::OP_GE : op = ">"; break;
+            case TT::OP_GT : op = ">"; break;
+            case TT::OP_GE : op = ">="; break;
             default: break;
         }
         advance();
@@ -355,7 +357,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
 
     if(check(TT::DELIM_LBRACKET)) return parseListExpr();
     if(check(TT::DELIM_LPAREN)) return parseTupleOrGroupedExpr();
-    if(check(TT::IDENT)) parseIdentOrConstructorExpr();
+    if(check(TT::IDENT)) return parseIdentOrConstructorExpr();
 
     return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
 }
@@ -438,13 +440,30 @@ std::expected<MatchArm, ParseError> Parser::parseMatchArm(){ //matchExprArm ::= 
     return MatchArm{std::move(*pattern), std::move(*body), pos};
 }
 
+std::expected<LambdaParam, ParseError> Parser::parseLambdaParam(){ 
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    auto nameTok = expect(TT::IDENT);
+    if(!nameTok) return std::unexpected(nameTok.error());
+
+    std::optional<Ptr<TypeNode>> type;
+    if(match(TT::OP_COLON)){ 
+        auto t = parseType();
+        if(!t) return std::unexpected(t.error());
+        type = std::move(*t);
+    }
+
+    return LambdaParam{std::move(nameTok -> lexeme), std::move(type), pos};
+}
+
 std::expected<Ptr<ExprNode>, ParseError> Parser::parseListExpr(){ //список '[' (expr (',' expr)*)? ']'
     
     using TT = Lexer::TokenType;
     auto pos = currentPos();
 
-    auto rb = expect(TT::DELIM_LBRACKET);
-    if(!rb) return std::unexpected(rb.error());
+    auto lb = expect(TT::DELIM_LBRACKET);
+    if(!lb) return std::unexpected(lb.error());
 
     std::vector<Ptr<ExprNode>> elems;
     
@@ -492,14 +511,14 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseTupleOrGroupedExpr(){ //к
             elems.push_back(std::move(*el));
         }
 
-        auto rp = expect(TT::DELIM_LPAREN);
+        auto rp = expect(TT::DELIM_RPAREN);
         if(!rp) return std::unexpected(rp.error());
 
         TupleExpr te{std::move(elems), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(te), pos});
     }
 
-    auto rp = expect(TT::DELIM_LPAREN);
+    auto rp = expect(TT::DELIM_RPAREN);
     if(!rp) return std::unexpected(rp.error());
     return std::move(*first); //(a + b) * z
 }

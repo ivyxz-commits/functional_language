@@ -39,7 +39,7 @@ Lexer::SourcePos Parser::currentPos() const {
 }
 
 const Lexer::Token& Parser::advance(){ 
-    if(!atEnd) m_pos++;
+    if(!atEnd()) m_pos++;
     return m_tokens[m_pos - 1];
 }
 
