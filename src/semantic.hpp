@@ -63,6 +63,7 @@ using TypeInfoVar = std::variant<
     FunctionType
 >;
 
+//представление типа во время семантического анализа (хранит смысл) | (аналог TypeNode, но только для семантики)
 struct TypeInfo{
     TypeInfoVar var;
     
@@ -155,17 +156,19 @@ private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
 
-    //вспомогательная - создание ошибки
+    //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
 
     //разбор объявлений
     void analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors);
     void analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>&errors);
     void analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //типам не нужно окружение, сразу в реестр типов
     void analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors);
+    void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>&errors);
 
-    //разбор образцов(шаблонов)
+    //разбор образцов(шаблонов) //образец хороший если он структурно совместим с типом сопоставляемого значения
+    //ConsPattern x : xs — хороший если expectedType это список, а иначе зачем нам внутрь заходить и проверять match и получать доп. ошибки
     bool analyzePattern(
         const PatternNode& pattern, //constructorPatternNode
         sPtr<TypeInfo> expectedType, //SimpleType("Option[int64]")
@@ -179,7 +182,27 @@ private:
             Some(v) -> v + 1
     } */
 
-    
+    //разбор типов (TypeNode -> TypeInfo)
+    std::optional<Ptr<TypeInfo>> resolveType(
+        const TypeNode& node,
+        //таблица подстановки параметров типа (разбираем типы внутри ADT)
+        const std::unordered_map<std::string, Ptr<TypeInfo>>& typeVarMap,
+        std::vector<SemanticError>& errors);
+
+    //вспомогательные функции
+    bool typesCompatibl(const TypeInfo& a, const TypeInfo& b) const; //совместимость
+    bool isNumericType(const TypeInfo& t) const;
+    bool isBoolType(const TypeInfo& t) const;
+    sPtr<Environment> makeBuiltinEnv(); //создаем начальное окружение с 4 функциями (print, input, exit, panic)
+
+    //регистрация всех объявлений верхнего уровня
+    void firstPass(const Program& prog, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    /* //если идти по порядку при анализации smth, bar еще не будет зарегестрирован и получим ошибку
+    /поэтому сначала регистрируем все обозначения и типы до проверки тел
+    *fn smth -> int64 = bar()
+    *fn bar -> int64 = number
+    */
 };
 
 }
