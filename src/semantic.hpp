@@ -136,7 +136,7 @@ public:
     //найти ADT по имени
     std::optional<DataTypeInfo> lookupData(const std::string& name) const;
     std::optional<ConstructorInfo> lookupConstructor (const std::string& name) const;
-    std::optional<Ptr<TypeInfo>> lookupAlias(const std::string& name) const;
+    std::optional<sPtr<TypeInfo>> lookupAlias(const std::string& name) const;
 
     sPtr<TypeInfo> resolveAlias(sPtr<TypeInfo> type) const;
     /*на случай: //FullName -> Name -> string
@@ -144,7 +144,7 @@ public:
     *type FullName = Name
     */
 private:
-    std::unordered_map<std::string, DataTypeInfo> m_DataTypes;
+    std::unordered_map<std::string, DataTypeInfo> m_dataTypes;
     std::unordered_map<std::string, ConstructorInfo> m_constructors;
     std::unordered_map<std::string, sPtr<TypeInfo>> m_aliases;
 };

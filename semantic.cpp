@@ -122,5 +122,77 @@ std::string TypeInfo::toString() const{
 }
 
 
+//окружение
+Environment::Environment(sPtr<Environment> parent) : m_parent(std::move(parent)){}
+
+bool Environment::define(const std::string& name, Symbol sym){ 
+    if(m_symbols.count(name)) return false; //потворое объявление запрещенно
+
+    m_symbols[name] = std::move(sym); //ячейку с ключом, (создается если не было)
+    return true;
+}
+
+std::optional<Symbol>Environment::lookup(const std::string& name) const{ 
+    auto it = m_symbols.find(name);
+    if(it != m_symbols.end()) return it->second; //возвращем symbol, если итератор не равен end()
+
+    if(m_parent) return m_parent->lookup(name);
+    return std::nullopt;
+}
+
+std::optional<Symbol>Environment::lookupLocal(const std::string& name) const{
+    auto it = m_symbols.find(name); //ищем в таблице символов
+    if(it != m_symbols.end()) return it->second;
+    return std::nullopt;
+}
+
+
+//реестр ADT и псевдонимов
+//регистрируем новый ADT тип
+bool TypeRegistry::registerData(DataTypeInfo info){ 
+    if(m_dataTypes.count(info.name)) return false;
+
+    for(const auto& ctor : info.constructors){ 
+        m_constructors[ctor.name] = ctor;
+    }
+
+    m_dataTypes[info.name] = std::move(info);
+    return true;
+}
+
+bool TypeRegistry::registerAlias(const std::string& name, sPtr<TypeInfo> type){
+    if(m_aliases.count(name)) return false;
+
+    m_aliases[name] = std::move(type);
+    return true;
+}
+
+//Найти ADT по имени
+std::optional<DataTypeInfo> TypeRegistry::lookupData(const std::string& name) const{
+    auto it = m_dataTypes.find(name);
+    if(it != m_dataTypes.end()) return it -> second;
+    return std::nullopt;
+}
+
+std::optional<ConstructorInfo> TypeRegistry::lookupConstructor(const std::string& name) const{ 
+    auto it = m_constructors.find(name);
+    if(it != m_constructors.end()) return it -> second;
+    return std::nullopt;
+}
+
+//Найти псевдоним по имени
+std::optional<sPtr<TypeInfo>> TypeRegistry::lookupAlias(const std::string& name) const{
+    auto it = m_aliases.find(name);
+    if(it != m_aliases.end()) return it -> second;
+    return std::nullopt;
+}
+
+sPtr<TypeInfo> TypeRegistry::resolveAlias(sPtr<TypeInfo> type) const{
+    if(auto* st = std::get_if<SimpleType>(&type->var)){ //лежит ли внутри type простой тип
+        auto alias = lookupAlias(st->name);   //если это псевдоним, то смотрим его
+        if(alias) return resolveAlias(*alias); //чтобы получить sPtr
+    }
+    return type;   
+}
 
 }
