@@ -24,6 +24,7 @@ struct SemanticError{
     }
 };
 
+
 //внутреннее представление типа в семантике
 //смысловой анализ происходящего
 struct TypeInfo;
@@ -188,6 +189,19 @@ private:
         //таблица подстановки параметров типа (разбираем типы внутри ADT)
         const std::unordered_map<std::string, Ptr<TypeInfo>>& typeVarMap,
         std::vector<SemanticError>& errors);
+
+
+    //разбор выражений (тип выажения или nullopt)
+    std::optional<sPtr<TypeInfo>> analyzeExpr(const ExprNode&, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeLeIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeIf(const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeMatch(const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeLambda(const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeBinary(const BinaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeUnary(const UnaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeFieldAccess(const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeCall(const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     //вспомогательные функции
     bool typesCompatibl(const TypeInfo& a, const TypeInfo& b) const; //совместимость
