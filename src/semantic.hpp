@@ -33,6 +33,7 @@ struct BuiltinType{
     std::string name;
 };
 
+//data Color - пользовательский тип или в alias
 struct SimpleType{ 
     std::string name;
 };
@@ -55,6 +56,7 @@ struct FunctionType{
     sPtr<TypeInfo> to;
 };
 
+// index() возвращние номера активного типа
 using TypeInfoVar = std::variant<
     BuiltinType,
     SimpleType,
@@ -75,7 +77,7 @@ struct TypeInfo{
 
 
 //добавим удобные конструкторы для создания TypeInfo
-sPtr<TypeInfo> makeBiultin(const std::string& name);
+sPtr<TypeInfo> makeBuiltin(const std::string& name);
 sPtr<TypeInfo> makeSimle(const std::string& name);
 sPtr<TypeInfo> makeList(sPtr<TypeInfo> elem);
 sPtr<TypeInfo> makeTuple(std::vector<sPtr<TypeInfo>> elems);
