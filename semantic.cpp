@@ -195,4 +195,62 @@ sPtr<TypeInfo> TypeRegistry::resolveAlias(sPtr<TypeInfo> type) const{
     return type;   
 }
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//семантический анализатор Analyzer
+
+SemanticError Analyzer::makeError(std::string msg, Pos pos) const{
+    return SemanticError{std::move(msg), pos};
+}
+
+//вспомогательные функции
+//функции проверки типов
+bool Analyzer::typesCompatible(const TypeInfo& a, const TypeInfo& b) const{
+    return a.equals(b);
+}
+
+//помогут в analyzeBinary и analyzeIf
+bool Analyzer::isNumericType(const TypeInfo& t) const {
+    if(auto* bt = std::get_if<BuiltinType>(&t.var)){ 
+        const std::string& name = bt->name;
+        return name == "int8" || name == "int16" || name == "int32" || name == "int64" ||
+        name == "uint8" || name == "uint16" || name == "uint32" || name == "uint64" || 
+        name == "float32" || name == "float64";
+    }
+    return false;
+}
+
+bool Analyzer::isBoolType(const TypeInfo& t) const{ 
+    if(auto* bt = std::get_if<BuiltinType>(&t.var)){
+        return bt->name == "bool";
+    }
+    return false;
+}
+
+
+//создание начального окружения со встроенными функциями 
+sPtr<Environment> Analyzer::makeBuiltinEnv(){ 
+    //глобальная область видимости parent = nullptr - конструктор по умолчанию
+    auto env = std::make_shared<Environment>(); //глобальная область видимости parent = nullptr //создание таблицы символов
+
+    env->define("print", Symbol{
+        "print", makeFunction(makeBuiltin("string"), makeBuiltin("unit")),
+        false, {0, 0}}); //т.к встроен, а не написан пользователем
+
+    env->define("input", Symbol{
+        "exit", makeFunction(makeBuiltin("unit"), makeBuiltin("string")),
+        false, {0, 0}});
+
+    env -> define("exit", Symbol{ 
+        "exit", makeFunction(makeBuiltin("int64"), makeBuiltin("unit")),
+        false, {0, 0}});
+
+    env->define("panic", Symbol{
+        "panic", makeFunction(makeBuiltin("string"), makeBuiltin("unit")),
+        false, {0, 0}});
+
+    return env;
+}
+
+
 }

@@ -111,6 +111,8 @@ struct Symbol{
 };
 
 
+
+
 //окружение (область видимости)
 //будет хранить таблицу символов и указатель на родительское окружение
 class Environment{ 
@@ -125,6 +127,8 @@ private:
     std::unordered_map<std::string, Symbol> m_symbols; //словарь, как ключ значение
     sPtr<Environment> m_parent; //каждая область видимости на родительскую область, которая тоже Environment
 };
+
+
 
 //справочник типов(ADT, Alliases) - хранилище - получение информации о типах данных
 class TypeRegistry{
@@ -148,6 +152,7 @@ private:
     std::unordered_map<std::string, ConstructorInfo> m_constructors;
     std::unordered_map<std::string, sPtr<TypeInfo>> m_aliases;
 };
+
 
 //сам семантический анализатор
 class Analyzer{ 
@@ -206,11 +211,13 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     //вспомогательные функции
-    bool typesCompatibl(const TypeInfo& a, const TypeInfo& b) const; //совместимость
+    //функции проверки типов
+    bool typesCompatible(const TypeInfo& a, const TypeInfo& b) const; //совместимость
     bool isNumericType(const TypeInfo& t) const;
     bool isBoolType(const TypeInfo& t) const;
-    sPtr<Environment> makeBuiltinEnv(); //создаем начальное окружение с 4 функциями (print, input, exit, panic)
 
+    sPtr<Environment> makeBuiltinEnv(); //создаем начальное окружение с 4 функциями (print, input, exit, panic)
+    
     //регистрация всех объявлений верхнего уровня
     void firstPass(const Program& prog, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
