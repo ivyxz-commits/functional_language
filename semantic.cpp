@@ -252,5 +252,26 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
     return env;
 }
 
+//реализация firstPass() soon...
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Analyzer::Analyzer(std::string filename) : m_filename(std::move(filename)) {}
+
+//точка входа, публичная функция analyze
+std::vector<SemanticError> Analyzer::analyze(const Program& prog){ 
+    std::vector <SemanticError> errors;
+
+    auto globalEnv = makeBuiltinEnv();
+    
+    //все объявления высшего уровня, для возможности ссылания друг на друга
+    firstPass(prog, globalEnv, errors);
+
+    //проверяем тела функций
+    for(const auto& decl : prog.decls){
+        analyzeDecl(*decl, globalEnv, errors); //т.к unique_ptr
+    }
+
+    return errors;
+}
 
 }
