@@ -219,7 +219,7 @@ private:
     sPtr<Environment> makeBuiltinEnv(); //создаем начальное окружение с 4 функциями (print, input, exit, panic)
     
     //регистрация всех объявлений верхнего уровня
-    void firstPass(const Program& prog, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     /* //если идти по порядку при анализации smth, bar еще не будет зарегестрирован и получим ошибку
     /поэтому сначала регистрируем все обозначения и типы до проверки тел

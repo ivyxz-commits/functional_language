@@ -238,7 +238,7 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
         false, {0, 0}}); //т.к встроен, а не написан пользователем
 
     env->define("input", Symbol{
-        "exit", makeFunction(makeBuiltin("unit"), makeBuiltin("string")),
+        "input", makeFunction(makeBuiltin("unit"), makeBuiltin("string")),
         false, {0, 0}});
 
     env -> define("exit", Symbol{ 
@@ -252,7 +252,78 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
     return env;
 }
 
-//реализация firstPass() soon...
+//реализация firstPass()
+void Analyzer::firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environment> env, std::vector<SemanticError>& errors){ 
+    for(const auto& decl : decls){
+
+        //typeAliasDecl
+        if(const auto* alias = std::get_if<TypeAliasDecl>(&decl->var)){ //по адресу
+            analyzeAliasDecl(*alias, errors);
+        }
+
+        else if(const auto* data = std::get_if<DataDecl>(&decl->var)){
+            analyzeDataDecl(*data, errors);
+        }
+
+        else if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){ 
+            std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+            sPtr<TypeInfo> funcType; //итоговый тип функции
+
+            if(fn->params.empty()){
+                sPtr<TypeInfo> retType;
+
+                if(fn->returnType){ //Тип - просто возвращаемый тип
+                    auto rt = resolveType(**fn -> returnType, typeVarMap, errors); //optional and ptr
+                    retType = rt ? *rt : makeBuiltin("unit");
+                } else {
+                    retType = makeBuiltin("unit"); //если возвращаемый тип не указали
+                }
+                funcType = makeFunction(makeBuiltin("unit"), retType);
+            } else {
+                sPtr<TypeInfo> retType; //чтобы строить цепочку справо налево (правая ассоциативность)
+
+                if(fn -> returnType){
+                    auto rt = resolveType(**fn->returnType, typeVarMap, errors);
+                    retType = rt ? *rt : makeBuiltin("unit");
+                } else {
+                    retType = makeBuiltin("unit");
+                }
+
+                funcType = retType;
+                bool hasError = false;
+                for(int i = static_cast<int>(fn->params.size()) - 1; i >= 0; i--){
+                    auto paramType = resolveType(*fn->params[i].type, typeVarMap, errors);
+
+                    if(!paramType){
+                        hasError = true;
+                        continue;
+                    }
+
+                    if(!hasError) funcType = makeFunction(*paramType, funcType);
+                }
+
+                if(hasError) funcType = makeBuiltin("unit"); //заглушка
+            }
+
+            if(!env ->define(fn->name, Symbol{fn->name, funcType, false, fn->pos})){
+                errors.push_back(makeError(
+                    "function '" + fn->name + "'is already declared", fn->pos));
+            }
+        } 
+
+        //объявление модуля
+        else if(const auto* mod = std::get_if<ModuleDecl>(&decl->var)){
+            auto modEnv = std::make_shared<Environment>(env);
+
+            firstPass(mod -> decls, modEnv, errors);
+
+            if(!env -> define(mod -> name, Symbol{mod -> name, makeBuiltin("unit"), false, mod -> pos})){
+                errors.push_back(makeError(
+                    "module '" + mod -> name + "' is already declared", mod->pos));
+            }
+        }
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 Analyzer::Analyzer(std::string filename) : m_filename(std::move(filename)) {}
@@ -264,7 +335,7 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
     auto globalEnv = makeBuiltinEnv();
     
     //все объявления высшего уровня, для возможности ссылания друг на друга
-    firstPass(prog, globalEnv, errors);
+    firstPass(prog.decls, globalEnv, errors);
 
     //проверяем тела функций
     for(const auto& decl : prog.decls){
@@ -310,6 +381,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
         //ищем data тип в реестре
         if(!data){
             errors.push_back(makeError("unknown generic type'" + n->name + "'", n->pos));
+            return std::nullopt;
         }
 
         //data Option[a] = Ok(a) | Err(e) - ошибка
@@ -321,12 +393,19 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
         }
 
         std::vector<sPtr<TypeInfo>> resolvedArgs;
+        bool hasError = false;
         for(const auto& arg: n->args){
             auto resolved = resolveType(*arg, typeVarMap, errors);
-            if(!resolved) return std::nullopt;
+
+            if(!resolved){
+                hasError = true; 
+                continue;
+            }
+
             resolvedArgs.push_back(std::move(*resolved));
         }
 
+        if(hasError) return std::nullopt;
         return makeGeneric(n->name, std::move(resolvedArgs));
     }
 
@@ -338,21 +417,31 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
 
     if(auto* n = std::get_if<TupleTypeNode>(&node.var)){
         std::vector<sPtr<TypeInfo>> elems;
+        bool hasError = false;
+
         for(const auto& elem : n->elems){
             auto resolved = resolveType(*elem, typeVarMap, errors);
-            if(!resolved) return std::nullopt;
+           
+            if(!resolved){
+                hasError = true;
+                continue;
+            }
+            
             elems.push_back(std::move(*resolved));
         }
+        
+        if(hasError) return std::nullopt;
         return makeTuple(std::move(elems));
     }
 
     if(auto* n = std::get_if<FunctionTypeNode>(&node.var)){
         auto from = resolveType(*n->from, typeVarMap, errors);
-        if(!from) return std::nullopt;
         auto to = resolveType(*n->to, typeVarMap, errors);
-        if(!to) return std::nullopt;
+        if(!from || !to) return std::nullopt;
         return makeFunction(std::move(*from), std::move(*to));
     }
+
+    return std::nullopt;
 
 }
 
