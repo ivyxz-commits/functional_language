@@ -1,5 +1,3 @@
-#pragma once
-
 #include "lexer.hpp"
 #include <cctype>
 #include <unordered_map>
@@ -116,7 +114,7 @@ std::expected<Token, LexError> Lexer::nextToken(){
         case ']': return Token{TokenType::DELIM_RBRACKET, "]", start};
         case '{': return Token{TokenType::DELIM_LBRACE, "{", start};
         case '}': return Token{TokenType::DELIM_RBRACE, "}", start};
-        case '//': return Token{TokenType::OP_BACKSLASH, "//", start};
+        case '\\': return Token{TokenType::OP_BACKSLASH, "//", start};
         
         case '=':
             if(match('=')) return Token{TokenType::OP_EQ, "==", start};

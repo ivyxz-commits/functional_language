@@ -145,7 +145,7 @@ constexpr const char* TokenTypeName(TokenType t) noexcept {
         case TokenType::DELIM_RBRACKET: return "]";
         case TokenType::DELIM_LBRACE: return "{";
         case TokenType::DELIM_RBRACE: return "}";
-        case TokenType::DELIM_COMMA: return "(";
+        case TokenType::DELIM_COMMA: return ",";
         case TokenType::END_OF_FILE: return "<EOF>";
         default: return "<unknown>"; //если неизвестный нам тип
     }

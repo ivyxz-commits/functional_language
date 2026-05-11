@@ -294,7 +294,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePostfix(){
             advance();
             auto args = parseArgList();
             if(!args) return std::unexpected(args.error());
-            auto rp  = expect(TT::DELIM_LPAREN);
+            auto rp  = expect(TT::DELIM_RPAREN);
             if(!rp) return std::unexpected(rp.error());
 
             CallExpr ce{std::move(*expr), std::move(*args), pos};
@@ -544,7 +544,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
                 if(!arg) return std::unexpected(arg.error());
                 args.push_back(std::move(*arg));
             }
-            auto rp = expect(TT::DELIM_LPAREN);
+            auto rp = expect(TT::DELIM_RPAREN);
             if(!rp) return std::unexpected(rp.error());
         }
         ConstructorExpr ce{std::move(name), std::move(args), pos};
