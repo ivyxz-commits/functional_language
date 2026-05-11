@@ -191,10 +191,10 @@ private:
     } */
 
     //разбор типов (TypeNode -> TypeInfo)
-    std::optional<Ptr<TypeInfo>> resolveType(
+    std::optional<sPtr<TypeInfo>> resolveType(
         const TypeNode& node,
         //таблица подстановки параметров типа (разбираем типы внутри ADT)
-        const std::unordered_map<std::string, Ptr<TypeInfo>>& typeVarMap,
+        const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
         std::vector<SemanticError>& errors);
 
 

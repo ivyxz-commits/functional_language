@@ -274,4 +274,86 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
     return errors;
 }
 
+
+
+//преобразуем тип TypeNode из AST в TypeInfo
+//typeVarMap - Таблица подстановки параметров (a -> int64)
+//удобнее сравнивать, два одинаковых узла типа, могут быть разными узлами AST (equals)
+//TypeNode name - просто строка, в TypeInfo after resolveAlias it is BuiltinType("string") -сразу можно сравнить
+std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node, 
+        const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
+        std::vector<SemanticError>& errors){    
+
+    //BuiltinTypeNode -> BuiltinType
+    if(auto* n = std::get_if<BuiltinTypeNode>(&node.var)){
+        return makeBuiltin(n -> name); 
+    }
+
+    //параметры типа, псведоним или ADT
+    if(auto* n = std::get_if<SimpleTypeNode>(&node.var)){
+        auto it = typeVarMap.find(n -> name);
+        if(it != typeVarMap.end()) return it -> second;
+
+        auto alias = m_registry.lookupAlias(n -> name);
+        if(alias) return *alias; //возвращаем тип на который он указывает
+
+        auto data = m_registry.lookupData(n -> name);
+        if(data) return makeSimle(n->name);
+
+        errors.push_back(makeError("unknown type '" + n->name + "'", n->pos));
+        return std::nullopt;
+    }
+
+    if(auto* n = std::get_if<GenericTypeNode>(&node.var)){ 
+        auto data = m_registry.lookupData(n->name);
+
+        //ищем data тип в реестре
+        if(!data){
+            errors.push_back(makeError("unknown generic type'" + n->name + "'", n->pos));
+        }
+
+        //data Option[a] = Ok(a) | Err(e) - ошибка
+        if(n->args.size() != data->typeParams.size()){
+            errors.push_back(makeError(
+                "type '" + n->name + "' expects" + std::to_string(data->typeParams.size()) + 
+                " type parameter(s), got " + std::to_string(n->args.size()), n->pos));
+            return std::nullopt;
+        }
+
+        std::vector<sPtr<TypeInfo>> resolvedArgs;
+        for(const auto& arg: n->args){
+            auto resolved = resolveType(*arg, typeVarMap, errors);
+            if(!resolved) return std::nullopt;
+            resolvedArgs.push_back(std::move(*resolved));
+        }
+
+        return makeGeneric(n->name, std::move(resolvedArgs));
+    }
+
+    if(auto* n = std::get_if<ListTypeNode>(&node.var)){
+        auto elem = resolveType(*n->elemType, typeVarMap, errors);
+        if(!elem) return std::nullopt;
+        return makeList(std::move(*elem));
+    }
+
+    if(auto* n = std::get_if<TupleTypeNode>(&node.var)){
+        std::vector<sPtr<TypeInfo>> elems;
+        for(const auto& elem : n->elems){
+            auto resolved = resolveType(*elem, typeVarMap, errors);
+            if(!resolved) return std::nullopt;
+            elems.push_back(std::move(*resolved));
+        }
+        return makeTuple(std::move(elems));
+    }
+
+    if(auto* n = std::get_if<FunctionTypeNode>(&node.var)){
+        auto from = resolveType(*n->from, typeVarMap, errors);
+        if(!from) return std::nullopt;
+        auto to = resolveType(*n->to, typeVarMap, errors);
+        if(!to) return std::nullopt;
+        return makeFunction(std::move(*from), std::move(*to));
+    }
+
+}
+
 }
