@@ -317,6 +317,8 @@ void Analyzer::firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environme
 
             firstPass(mod -> decls, modEnv, errors);
 
+            //m_moduleEnvs[mod -> name] = modEnv //это для будущего обращения к модулю через analyzeFieldAccess
+
             if(!env -> define(mod -> name, Symbol{mod -> name, makeBuiltin("unit"), false, mod -> pos})){
                 errors.push_back(makeError(
                     "module '" + mod -> name + "' is already declared", mod->pos));
@@ -344,7 +346,6 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
 
     return errors;
 }
-
 
 
 //преобразуем тип TypeNode из AST в TypeInfo
@@ -444,5 +445,53 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
     return std::nullopt;
 
 }
+
+
+//анализирование объявлений(а на деле это второй проход и функций)
+//псевдонимы и ADT зарегетсрированы в m_registry, нужно проверить только тела
+void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    if(const auto* fn = std::get_if<FuncDecl>(&decl.var)){
+        analyzeFuncDecl(*fn, env, errors);
+    } 
+
+    else if(const auto* mod = std::get_if<ModuleDecl>(&decl.var)){
+        analyzeModuleDecl(*mod, env, errors);
+    }
+}
+
+
+
+
+//функции реализации
+//analyzeFuncDecl - проверка тела функции
+void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    auto funcEnv = std::make_shared<Environment>(env); 
+
+    //моя реализация не поддерживает fn smth[a](x: a) -> a = x - у меня функция не параметризована типом
+    //std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap - она соотвественно будет пустой
+
+    for(const auto& param : fn.params){
+        auto paramType = resolveType(*param.type, {}, errors); //просто также пустоту передали, так как в таблице и так ничего не будет
+        if(!paramType) continue; //ошибку уже добавили
+
+        if(!funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos}));
+        errors.push_back(makeError(
+            "parameter '" + param.name + "' is already declared", param.pos));
+    }
+
+    auto symbol = env->lookup(fn.name); //function name
+    if(symbol){
+        funcEnv -> define(fn.name, *symbol);
+    } else {
+        errors.push_back(makeError(
+            "function '" + fn.name + "' not found in environment", fn.pos));
+    }
+
+    //проверка тела функции
+    auto bodyType = analyzeExpr(*fn.body, funcEnv, errors);
+    //etc
+}
+
+
 
 }
