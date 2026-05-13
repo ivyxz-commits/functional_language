@@ -86,6 +86,14 @@ private:
     std::expected<Ptr<ExprNode>, ParseError> parseListExpr();
     std::expected<Ptr<ExprNode>, ParseError> parseTupleOrGroupedExpr(); 
     std::expected<Ptr<ExprNode>, ParseError> parseIdentOrConstructorExpr();
+    std::expected<Ptr<ExprNode>, ParseError> parseLiteral();
+
+    //для создания литералов || шаблон - для работы с разными литералами || - всегда в hpp
+    template<typename T>
+    Ptr<ExprNode> makeLiteral(T value, Pos pos){
+        LiteralExpr lit{LiteralValue{std::move(value)}, pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(lit), pos});
+    }
 
     //для функции
     std::expected<FuncParam, ParseError> parseFuncParam();

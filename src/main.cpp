@@ -94,24 +94,27 @@ void printDecl(const Parser::DeclNode& node, int space);
 void printExpr(const Parser::ExprNode& node, int space){
     std::string padding(space * 2, ' ');
 
-    if(const auto* e = std::get_if<Parser::IntLitExpr>(&node.var)){
-        std::cout << padding << "IntLit: " << e->value << "\n";
-    }
+    if(const auto* e = std::get_if<Parser::LiteralExpr>(&node.var)){
+    
+        if(const auto* v = std::get_if<long long>(&e->value)){
+            std::cout << padding << "IntLit: " << *v << "\n";
+        }
 
-    else if(const auto* e = std::get_if<Parser::RealLitExpr>(&node.var)){
-        std::cout << padding << "RealLit: " << e->value << "\n";
-    }
+        else if(const auto* v = std::get_if<double>(&e->value)){
+            std::cout << padding << "RealLit: " << *v << "\n";
+        }
 
-    else if(const auto* e = std::get_if<Parser::StringLitExpr>(&node.var)){
-        std::cout << padding << "StringLit: \"" << e->value << "\"\n";
-    }
+        else if(const auto* v = std::get_if<std::string>(&e->value)){
+            std::cout << padding << "StringLit: \"" << *v << "\"\n";
+        }
 
-    else if(const auto* e = std::get_if<Parser::UnitLitExpr>(&node.var)){
-        std::cout << padding << "UnitLit\n";
-    }
+        else if(const auto* v = std::get_if<bool>(&e->value)){
+            std::cout << padding << "BoolLit: " << (*v ? "yep" : "nope") << "\n";
+        }
 
-    else if(const auto* e = std::get_if<Parser::BoolLitExpr>(&node.var)){
-        std::cout << padding << "BoolLit: " << (e->value ? "yep" : "none") << "\n";
+        else if(std::get_if<std::monostate>(&e->value)){
+            std::cout << padding << "UnitLit\n";
+        }
     }
 
     else if(const auto* e = std::get_if<Parser::IdentExpr>(&node.var)){
@@ -119,13 +122,38 @@ void printExpr(const Parser::ExprNode& node, int space){
     }
 
     else if(const auto* e = std::get_if<Parser::UnaryExpr>(&node.var)){
-        std::cout << padding << "Unary: " << e->op << "\n";
-        printExpr( *e->operand, space + 1);
+        std::string opStr;
+    
+        switch(e->op){
+            case Parser::UnaryOp::Neg: opStr = "-";   break;
+            case Parser::UnaryOp::Not: opStr = "not"; break;
+        }
+
+        std::cout << padding << "Unary: " << opStr << "\n";
+        printExpr(*e->operand, space + 1);
     }
 
     else if(const auto* e = std::get_if<Parser::BinaryExpr>(&node.var)){
-        std::cout << padding << "Binary: " << e->op << "\n";
-        printExpr(*e->left, space + 1);
+        std::string opStr;
+
+        switch(e->op){
+            case Parser::BinaryOp::Add: opStr = "+";   break;
+            case Parser::BinaryOp::Sub: opStr = "-";   break;
+            case Parser::BinaryOp::Mul: opStr = "*";   break;
+            case Parser::BinaryOp::Div: opStr = "/";   break;
+            case Parser::BinaryOp::Mod: opStr = "%";   break;
+            case Parser::BinaryOp::Eq:  opStr = "==";  break;
+            case Parser::BinaryOp::Neq: opStr = "!=";  break;
+            case Parser::BinaryOp::Lt:  opStr = "<";   break;
+            case Parser::BinaryOp::Le:  opStr = "<=";  break;
+            case Parser::BinaryOp::Gt:  opStr = ">";   break;
+            case Parser::BinaryOp::Ge:  opStr = ">=";  break;
+            case Parser::BinaryOp::And: opStr = "and"; break;
+            case Parser::BinaryOp::Or:  opStr = "or";  break;
+        }
+
+        std::cout << padding << "Binary: " << opStr << "\n";
+        printExpr(*e->left,  space + 1);
         printExpr(*e->right, space + 1);
     }
 
@@ -281,17 +309,18 @@ int main(int argc, char* argv[]){
     //лексер
     Lexer::Lexer lexer(source, filename);
 
-    auto tokensResult = lexer.tokenize(); //указатель на вектор токенов
-    if(!tokensResult){
-        std::cerr << tokensResult.error().format(filename) << "\n";
-        return 1;
-    }
-
-    auto tokens = std::move(*tokensResult);
+    auto lexResult = lexer.tokenize(); //указатель на вектор токенов
 
     if(dumpTokens){
-        printTokens(tokens);
+        printTokens(lexResult.tokens);
     }
+
+    for(const auto& err : lexResult.errors){
+        std::cerr << err.format(filename) << "\n";
+    }
+
+    if(lexResult.hasErrors()) return 1;
+    auto tokens = std::move(lexResult.tokens);
 
     //теперь парсер
     Parser::Parser parser(tokens, filename);

@@ -11,7 +11,7 @@ Lexer::Lexer(std::string source, std::string filename)
  
 //основной метод разбиения на токены
 //декларативный подход присутствует
-std::expected<std::vector<Token>, LexError> Lexer::tokenize(){ 
+LexResult Lexer::tokenize(){ 
     std::vector<Token> tokens;
     while(true){ 
         skipWhitespacesandComments();
@@ -22,12 +22,15 @@ std::expected<std::vector<Token>, LexError> Lexer::tokenize(){
             }
             auto result = nextToken();
             if(!result){ 
-                return(std::unexpected(result.error())); //достаем ошибку, тем самым наш LexError
+                m_errors.push_back(result.error()); //достаем ошибку, тем самым наш LexError
+                advance();
+                continue;
             }
+
             tokens.push_back(std::move(*result)); 
     }
 
-    return tokens;
+    return LexResult{std::move(tokens), std::move(m_errors)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,10 +163,10 @@ std::expected<Token, LexError> Lexer::nextToken(){
 std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){ 
     //std::string(size_t count, char ch); - конструктор string такого плана
     //накапливать лексему будем начиная с 1 цифры
-    std::string lexeme(1, m_source[m_pos - 1]);
+    int startPos = m_pos - 1;
 
     while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
-        lexeme += advance();
+        advance();
     }
 
     bool isReal = false;
@@ -171,9 +174,9 @@ std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){
     // это вещественная часть?
     if(!atEnd() && peek() == '.' && std::isdigit(static_cast<unsigned char>(peek(1)))) {
         isReal = true;
-        lexeme += advance(); //'.'
+        advance(); //'.'
         while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
-            lexeme += advance();
+            advance();
         }
     }
 
@@ -184,19 +187,21 @@ std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){
 
         if(hasExp){ 
             isReal = true;
-            lexeme += advance ();
+            advance (); //e | E
 
             if(!atEnd() && (peek() == '+' || peek() == '-')){ 
-                lexeme += advance();
+                advance();
             }
 
             while(!atEnd() && std::isdigit(static_cast<unsigned char>(peek()))){ 
-                lexeme += advance();
+                advance();
             }
         } else { 
             return std::unexpected(LexError{"invalid exponent in numerical literal", currentPos()});
         }
     }
+
+    std::string lexeme = m_source.substr(startPos, m_pos - startPos);
 
     if(isReal){ 
         return Token{TokenType::LIT_REAL, std::move(lexeme), start};
@@ -222,20 +227,14 @@ std::expected<Token, LexError> Lexer::scanString(SourcePos start){
         }
 
         if(c == '\\'){ 
-            if(atEnd()){ 
-                return std::unexpected(LexError{"unterminated escape sequence", start});
-            }
-            char esc = advance();
-            switch(esc){ 
-                case 'n': lexeme += '\n'; break;
-                case '\\': lexeme += '\\'; break;
-                case '"':  lexeme += '"';  break;
-                default: 
-                    return std::unexpected(LexError{ 
-                        std::string("invalid escape sequence '\\") + esc + "'", start
-                    });
-            }
+           auto escaped = scanEscapeSequence();
+           if(!escaped){
+            m_errors.push_back(makeError("invalid escape sequence"));
             continue;
+           }
+
+           lexeme += *escaped;
+           continue;
         }
 
         //опционально: в будущем добавим русский язык
@@ -246,6 +245,23 @@ std::expected<Token, LexError> Lexer::scanString(SourcePos start){
                 "non ASCII character in string terminal", currentPos()
             });
         }
+
+        lexeme += c;
+    }
+}
+
+//вспомогательная функция
+std::optional<char> Lexer::scanEscapeSequence(){
+    if(atEnd()) return std::nullopt;
+
+    char esc = advance();
+    switch(esc){
+        case 'n': return '\n';
+        case 't': return '\t';
+        case 'r': return '\r';
+        case '"': return '"';
+        case '\\': return '\\';
+        default: return std::nullopt;
     }
 }
 
@@ -253,17 +269,18 @@ std::expected<Token, LexError> Lexer::scanString(SourcePos start){
 
 //идентификатор либо ключевое слово
 std::expected<Token, LexError> Lexer::scanIdentOrKeyword(SourcePos start){ 
-    std::string lexeme(1, m_source[m_pos - 1]);
+    int startPos = m_pos - 1; //первый символ уже взяли
 
     while(!atEnd()){ 
         char c = peek();
         if(std::isalnum(static_cast<unsigned char>(c)) || c == '_'){ 
-            lexeme += advance();
+            advance();
         } else { 
             break;
         }
     }
 
+    std::string lexeme = m_source.substr(startPos, m_pos - startPos);
     TokenType type = classifyWord(lexeme);
     return Token{type, std::move(lexeme), start};
 }

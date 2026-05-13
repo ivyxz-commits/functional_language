@@ -1,3 +1,6 @@
-fn compute(x: int64, y: int64) -> int64 =
-    let sum = x + y, diff = x - y in
-    sum * diff
+fn main() -> int64 =
+    let a = "hello\qworld\z" in
+    let b = 123@ in
+    let c = "unclosed in
+    let d = 1.5eX in
+    a + b

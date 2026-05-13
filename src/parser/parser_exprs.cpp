@@ -1,5 +1,6 @@
 
 #include "parser.hpp" 
+#include <utility>
 
 namespace Parser{
 //выражения
@@ -149,7 +150,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseLogicalOr(){
         advance();
         auto rhs = parseLogicalAnd();
         if(!rhs) return std::unexpected(rhs.error());
-        BinaryExpr bin{"or", std::move(*lhs), std::move(*rhs), pos};
+        BinaryExpr bin{BinaryOp::Or, std::move(*lhs), std::move(*rhs), pos};
         *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos}); //(a or b) or c
     }
     return std::move(*lhs);
@@ -166,7 +167,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseLogicalAnd(){
         advance();
         auto rhs = parseEquality();
         if(!rhs) return std::unexpected(rhs.error());
-        BinaryExpr bin{"and", std::move(*lhs), std::move(*rhs), pos};
+        BinaryExpr bin{BinaryOp::And, std::move(*lhs), std::move(*rhs), pos};
         *lhs = std::make_unique<ExprNode>(ExprNode{std::move(bin), pos});
     }
     return std::move(*lhs);
@@ -180,7 +181,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseEquality(){
 
     while(check(TT::OP_EQ) || check(TT::OP_NEQ)){ 
         auto pos = currentPos();
-        std::string op = (current().type == TT::OP_EQ) ? "==" : "!=";
+        BinaryOp op = (current().type == TT::OP_EQ) ? BinaryOp::Eq : BinaryOp::Neq;
         advance();
         auto rhs = parseComparison();
         if(!rhs) return std::unexpected(rhs.error());
@@ -198,13 +199,13 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseComparison(){
 
     while(check(TT::OP_LT) || check(TT::OP_LE) || check(TT::OP_GT) || check(TT::OP_GE)){ 
         auto pos = currentPos();
-        std::string op;
+        BinaryOp op;
         switch (current().type){ 
-            case TT::OP_LT : op = "<"; break;
-            case TT::OP_LE : op = "<="; break;
-            case TT::OP_GT : op = ">"; break;
-            case TT::OP_GE : op = ">="; break;
-            default: break;
+            case TT::OP_LT : op = BinaryOp::Lt; break;
+            case TT::OP_LE : op = BinaryOp::Le; break;
+            case TT::OP_GT : op = BinaryOp::Gt; break;
+            case TT::OP_GE : op = BinaryOp::Ge; break;
+            default: op = BinaryOp::Lt; //но при этом 
         }
         advance();
         auto rhs = parseAdditive();
@@ -223,7 +224,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseAdditive(){
 
     while(check(TT::OP_PLUS) || check(TT::OP_MINUS)){ 
         auto pos = currentPos();
-        std::string op = (current().type == TT::OP_PLUS) ? "+" : "-";
+        BinaryOp op = (current().type == TT::OP_PLUS) ? BinaryOp::Add : BinaryOp::Sub;
         advance();
         auto rhs = parseMultiplicative();
         if(!rhs) return std::unexpected(rhs.error());
@@ -241,12 +242,12 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMultiplicative(){
 
     while(check(TT::OP_STAR) || check(TT::OP_SLASH) || check(TT::OP_PERCENT)){ 
         auto pos = currentPos();
-        std::string op;
+        BinaryOp op;
         switch(current().type){ 
-            case TT::OP_STAR : op = "*"; break;
-            case TT::OP_SLASH: op = "/"; break;
-            case TT::OP_PERCENT: op = "%"; break;
-            default: break;
+            case TT::OP_STAR : op = BinaryOp::Mul; break;
+            case TT::OP_SLASH: op = BinaryOp::Div; break;
+            case TT::OP_PERCENT: op = BinaryOp::Mul; break;
+            default: op = BinaryOp::Mul; //недостижима, как заглушка 
         }
         advance();
         auto rhs = parseUnary();
@@ -265,14 +266,14 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseUnary(){
         advance();
         auto operand = parseUnary();
         if(!operand) return std::unexpected(operand.error());
-        UnaryExpr ue{"-", std::move(*operand), pos};
+        UnaryExpr ue{UnaryOp::Neg, std::move(*operand), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
     } else if (check(TT::KW_NOT)){ 
         auto pos = currentPos();
         advance();
         auto operand = parseUnary();
         if(!operand) return std::unexpected(operand.error());
-        UnaryExpr ue{"not", std::move(*operand), pos};
+        UnaryExpr ue{UnaryOp::Not, std::move(*operand), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
         
     }
@@ -319,40 +320,9 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
     using TT = Lexer::TokenType;
     auto pos = currentPos();
 
-    if(check(TT::LIT_INT)){ 
-        std::string lex = advance().lexeme;
-        long long value = 0;
-        for(char ch : lex) value = value * 10 + (ch - '0');
-        IntLitExpr ile{std::move(value), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ile), pos});
-    }
-
-    if(check(TT::LIT_REAL)){ 
-        std::string lex = advance().lexeme;
-        double value = std::strtod(lex.c_str(), nullptr);
-        RealLitExpr rle{std::move(value), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(rle), pos});
-    }
-
-    if(check(TT::LIT_STRING)){ 
-        std::string value = advance().lexeme;
-        StringLitExpr sle{std::move(value), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(sle), pos});
-    }
-
-    if(match(TT::LIT_YEP)){
-        BoolLitExpr ble{true, pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ble), pos});
-    }
-
-    if(match(TT::LIT_NOPE)){
-        BoolLitExpr ble{false, pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ble), pos});
-    }
-
-    if(match(TT::KW_UNIT)){ 
-        UnitLitExpr ule{pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ule), pos});
+    if(check(TT::LIT_INT) || check(TT::LIT_REAL) || check(TT::LIT_STRING) 
+    || check(TT::LIT_YEP) || check(TT::LIT_NOPE) || check(TT::KW_UNIT)){
+        return parseLiteral();
     }
 
     if(check(TT::DELIM_LBRACKET)) return parseListExpr();
@@ -553,6 +523,34 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
 
     IdentExpr ie{std::move(name), pos};
     return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});
+}
+
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseLiteral(){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    if(check(TT::LIT_INT)){
+        std::string lex = advance().lexeme;
+        long long value = 0; //T - автоматически компилятором определяется
+        for(char ch : lex) value = value * 10 + (ch - '0');
+        return makeLiteral(value, pos);
+    }
+
+    if(check(TT::LIT_REAL)){
+        std::string lex = advance().lexeme;
+        double value = std::strtod(lex.c_str(), nullptr);
+        return makeLiteral(value, pos);
+    }
+
+    if(check(TT::LIT_STRING)){
+        return makeLiteral(std::string(advance().lexeme), pos);
+    }
+
+    if(match(TT::LIT_YEP)) return makeLiteral(true, pos);
+    if(match(TT::LIT_NOPE)) return makeLiteral(false, pos);
+    if(match(TT::KW_UNIT)) return makeLiteral(std::monostate{}, pos);
+
+    std::unreachable(); //c++ 23 - недостижим
 }
 
 }

@@ -166,27 +166,18 @@ struct PatternNode{
 struct ExprNode;
 
 //Примитивные выражения
-struct IntLitExpr{ 
-    long long value;
+using LiteralValue = std::variant<
+    long long,
+    double, 
+    std::string,
+    bool,
+    std::monostate
+>;
+
+struct LiteralExpr{
+    LiteralValue value;
     Pos pos;
 };
-
-struct RealLitExpr{ 
-    double value;
-    Pos pos;
-};
-
-struct StringLitExpr{ 
-    std::string value;
-    Pos pos;
-};
-
-struct BoolLitExpr{ 
-    bool value;
-    Pos pos;
-};
-
-struct UnitLitExpr{Pos pos;};
 
 struct IdentExpr{ 
     std::string name; 
@@ -194,14 +185,24 @@ struct IdentExpr{
 };
 
 
-struct UnaryExpr{ 
-    std::string op; //"-", "not"
+enum class BinaryOp{
+    Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, 
+    Le, Gt, Ge, And, Or
+};
+
+enum class UnaryOp{
+    Neg, 
+    Not
+};
+
+struct UnaryExpr{
+    UnaryOp op;
     Ptr<ExprNode> operand;
     Pos pos;
 };
 
-struct BinaryExpr{ 
-    std::string op; 
+struct BinaryExpr{
+    BinaryOp op;
     Ptr<ExprNode> left;
     Ptr<ExprNode> right;
     Pos pos;
@@ -314,11 +315,7 @@ fn area(s: Shape) -> float64 =
   } */
 
 using ExprNodeVar = std::variant<
-    IntLitExpr,
-    RealLitExpr, 
-    StringLitExpr,
-    BoolLitExpr,
-    UnitLitExpr,
+    LiteralExpr,
     IdentExpr,
     UnaryExpr,
     BinaryExpr,

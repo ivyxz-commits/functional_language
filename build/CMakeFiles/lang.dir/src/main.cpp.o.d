@@ -163,8 +163,19 @@ CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp \
  /usr/include/c++/13/bits/stl_uninitialized.h \
  /usr/include/c++/13/bits/stl_vector.h \
  /usr/include/c++/13/bits/stl_bvector.h \
- /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/expected \
- /home/ivan_su/project/src/tokens.hpp \
+ /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/optional \
+ /usr/include/c++/13/bits/enable_special_members.h \
+ /usr/include/c++/13/expected /home/ivan_su/project/src/tokens.hpp \
+ /usr/include/c++/13/format /usr/include/c++/13/array \
+ /usr/include/c++/13/charconv /usr/include/c++/13/limits \
+ /usr/include/c++/13/locale \
+ /usr/include/c++/13/bits/locale_facets_nonio.h /usr/include/c++/13/ctime \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \
+ /usr/include/libintl.h /usr/include/c++/13/bits/locale_facets_nonio.tcc \
+ /usr/include/c++/13/bits/locale_conv.h /usr/include/c++/13/span \
+ /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
+ /usr/include/c++/13/bits/ranges_algobase.h \
  /home/ivan_su/project/src/parser/parser.hpp \
  /home/ivan_su/project/src/ast.hpp /usr/include/c++/13/memory \
  /usr/include/c++/13/bits/stl_tempbuf.h \
@@ -206,8 +217,5 @@ CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp \
  /usr/include/c++/13/bits/std_mutex.h \
  /usr/include/c++/13/backward/auto_ptr.h \
  /usr/include/c++/13/bits/ranges_uninitialized.h \
- /usr/include/c++/13/bits/ranges_algobase.h \
  /usr/include/c++/13/pstl/glue_memory_defs.h \
- /usr/include/c++/13/pstl/execution_defs.h /usr/include/c++/13/optional \
- /usr/include/c++/13/bits/enable_special_members.h \
- /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h
+ /usr/include/c++/13/pstl/execution_defs.h

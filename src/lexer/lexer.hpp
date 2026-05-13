@@ -2,9 +2,10 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 #include <expected> //шаблон для явной обработки ошибки std::expected<T, E>
 #include "tokens.hpp" 
-
+#include <format>
 
 namespace Lexer{ 
 
@@ -12,16 +13,38 @@ namespace Lexer{
 struct LexError{ 
     std::string message;
     SourcePos pos;
+    //std::string filename;
 
     //конструктор, вообще говоря необязателен
     /*LexError(std::string msg, SourcePos p)
         : message(std::move(msg)), pos(p) {} */
-
     //функция форматирования ошибки в вид file:line:column: error: msg
     std::string format(const std::string& filename) const { 
         return filename + ":" + std::to_string(pos.line) + ":" + 
             std::to_string(pos.column) + ": error: lexical error: " + message; 
     }
+
+    /*
+    template<>
+    struct std::formatter<Lexer::LexError>{
+
+        auto parse(std::format_parser_context& ctx){ //разбирает спецификаторы формата
+            return ctx.begin();
+        }
+
+        auto format(const Lexer::LexError& e, std::format_context& ctx) const{
+            return std::format_to(ctx.out, "{}:{}:{}: error: lexical error: {}, e.filename, e.pos.line, e.pos.column, e.message");
+
+        }
+    } */
+
+};
+
+struct LexResult{
+    std::vector<Token> tokens;
+    std::vector<LexError> errors;
+
+    bool hasErrors() const {return !errors.empty();}
 };
 
 
@@ -30,7 +53,7 @@ class Lexer{
 
 public:
     Lexer(std::string source, std::string filename = "<input>");
-    std::expected<std::vector<Token>, LexError> tokenize(); //разбивает на токены
+    LexResult tokenize(); //разбивает на токены
 
 private: 
     std::string m_source;  //наш исходный текст
@@ -40,6 +63,7 @@ private:
     std::size_t m_pos = 0;
     int m_line = 1;
     int m_col = 1;
+    std::vector<LexError> m_errors;
 
     //вспомогательные методы
     bool atEnd() const; //дошли ли до конца текста
@@ -58,7 +82,11 @@ private:
 
     //отдельные функции для разных токенов
     std::expected<Token, LexError>scanNumber(SourcePos start);
+    
+    //вспомогательная функция
     std::expected<Token, LexError>scanString(SourcePos start); //строковый литерал
+    std::optional<char> scanEscapeSequence();
+
     std::expected<Token, LexError>scanIdentOrKeyword(SourcePos start);
 
     LexError makeError(std::string msg) const; //удобная функция для создания ошибки

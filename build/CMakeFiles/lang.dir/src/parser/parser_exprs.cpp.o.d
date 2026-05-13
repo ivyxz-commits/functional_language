@@ -201,4 +201,5 @@ CMakeFiles/lang.dir/src/parser/parser_exprs.cpp.o: \
  /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/optional \
  /usr/include/c++/13/bits/enable_special_members.h \
  /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
- /home/ivan_su/project/src/tokens.hpp /usr/include/c++/13/expected
+ /home/ivan_su/project/src/tokens.hpp /usr/include/c++/13/expected \
+ /usr/include/c++/13/utility /usr/include/c++/13/bits/stl_relops.h
