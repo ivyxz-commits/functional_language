@@ -261,21 +261,17 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMultiplicative(){
 //unary ::=('-' | 'not') unary | postfix
 std::expected<Ptr<ExprNode>, ParseError> Parser::parseUnary(){ 
     using TT = Lexer::TokenType;
-    if(check(TT::OP_MINUS)){ 
+    if(check(TT::OP_MINUS) || check(TT::KW_NOT)){ 
         auto pos = currentPos();
+
+        UnaryOp op = (current().type == TT::OP_MINUS) ? UnaryOp::Neg : UnaryOp::Not;
+
         advance();
+
         auto operand = parseUnary();
         if(!operand) return std::unexpected(operand.error());
-        UnaryExpr ue{UnaryOp::Neg, std::move(*operand), pos};
+        UnaryExpr ue{op, std::move(*operand), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
-    } else if (check(TT::KW_NOT)){ 
-        auto pos = currentPos();
-        advance();
-        auto operand = parseUnary();
-        if(!operand) return std::unexpected(operand.error());
-        UnaryExpr ue{UnaryOp::Not, std::move(*operand), pos};
-        return std::make_unique<ExprNode>(ExprNode{std::move(ue), pos});
-        
     }
     return parsePostfix();
 }
