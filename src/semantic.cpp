@@ -84,7 +84,7 @@ bool TypeInfo::equals(const TypeInfo& other) const {
 
 //для красивого вывода ошибок //вывод типа из TypeInfo
 std::string TypeInfo::toString() const{
-    if(auto* t = std::get_if<BuiltinType>(&var)){ 
+    if(auto* t = std::get_if<BuiltinType>(&var)){ //&this -> var - указатель на текущий объект
         return t->name;
     }
 
@@ -628,6 +628,77 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
 
     return std::nullopt;
 }
+
+
+
+//analyzeIf
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeIf(
+    const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+        
+    auto condType = analyzeExpr(*e.cond, env, errors); //возвращает тип условия
+    if(condType && !isBoolType(**condType)){
+        errors.push_back(makeError(
+            "if condition must be bool, got '" + 
+            (*condType) -> toString() + "'", e.pos));
+    }
+
+    auto thenType = analyzeExpr(*e.thenBranch, env, errors);
+    auto elseType = analyzeExpr(*e.elseBranch, env, errors);
+
+    if(!thenType || !elseType) return std::nullopt; //не удалось типизировать, тип if определить нельзя
+
+    //если разные типы - нарушает статическую типизацию
+    if(!typesCompatible(**thenType, **elseType)){
+        errors.push_back(makeError(
+            "if branches have different types: '" + 
+            (*thenType) -> toString() + "' and '" + 
+            (*elseType) -> toString() + "'", e.pos));
+    }
+
+    return *thenType;
+}
+
+//analyzeUnary
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeUnary(
+    const UnaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto operandType = analyzeExpr(*e.operand, env, errors);
+    if(!operandType) return std::nullopt;
+
+    if(e.op == UnaryOp::Neg){
+        if(!isNumericType(**operandType)){
+            errors.push_back(makeError(
+                "unary '-' requires numeric type, got '" +
+                (*operandType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+        return *operandType;
+    }
+
+    if(e.op == UnaryOp::Not){
+        if(!isBoolType(**operandType)){
+            errors.push_back(makeError(
+                "'not' requires bool, got '" + 
+                (*operandType) -> toString() + "'", e.pos));
+            return std::nullopt;
+        }
+        return makeBuiltin("bool");
+    }
+
+    return std::nullopt;
+}
+
+
+//analyzeBinary
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
+    const BinaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+        
+    auto leftType = analyzeExpr(*e.left, env, errors);
+    auto rightType = analyzeExpr(*e.right, env, errors);
+    if(!leftType || !rightType) return std::nullopt; //неизвестная переменная, невалидный вызов функции, вложенная ошибка
+}
+
 
 
 }
