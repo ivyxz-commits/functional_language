@@ -31,50 +31,11 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parsePrimaryPattern(){
         return std::make_unique<PatternNode>(PatternNode{WildcardPatternNode{pos}, pos});
     }
 
-    //булевые литералы
-    if(match(TT::LIT_YEP)){ 
-        LiteralPatternNode lp{"yep", LiteralPatternNode::Kind::Bool, pos};
-        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-    }
-    if(match(TT::LIT_NOPE)){ 
-        LiteralPatternNode lp{"nope", LiteralPatternNode::Kind::Bool, pos};
-        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-    }
-
-    //целый литерал
-    if(check(TT::LIT_INT)){ 
-        std::string value = advance().lexeme;
-        LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Int, pos};
-        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-    }
-
-    if(check(TT::LIT_REAL)){ 
-        std::string value = advance().lexeme;
-        LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Real, pos};
-        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-    }
-
-    //строковый
-    if(check(TT::LIT_STRING)){ 
-        std::string value = advance().lexeme;
-        LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::String, pos};
-        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-    }
-
-    //отрицательный числовой литерал - INT or REAL
-    if(check(TT::OP_MINUS) && (peek(1).type == TT::LIT_INT || peek(1).type == TT::LIT_REAL)){ 
-        advance();
-        
-        if(check(TT::LIT_INT)){ 
-            std::string value = "-" + advance().lexeme;
-            LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Int, pos};
-            return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-        } else { 
-            std::string value = "-" + advance().lexeme;
-            LiteralPatternNode lp{std::move(value), LiteralPatternNode::Kind::Real, pos};
-            return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
-        }
-    }
+    if(check(TT::LIT_YEP) || check(TT::LIT_NOPE) 
+    || check(TT::LIT_INT) || check(TT::LIT_REAL)  
+    || check(TT::LIT_STRING) || 
+    (check(TT::OP_MINUS) && (peek(1).type == TT::LIT_INT || peek(1).type == TT::LIT_REAL)))
+    return parseLiteralPattern(); 
 
     if(check(TT::DELIM_LBRACKET)) return parseListPattern();
     if(check(TT::DELIM_LPAREN)) return parseTupleOrGroupedPattern();
@@ -191,6 +152,42 @@ std::expected<Ptr<PatternNode>, ParseError> Parser::parseIdentPattern(){
     return std::make_unique<PatternNode>(PatternNode{std::move(np), pos});
 }
 
+std::expected<Ptr<PatternNode>, ParseError> Parser::parseLiteralPattern(){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
 
+    // отрицательный числовой литерал
+    if(check(TT::OP_MINUS) && (peek(1).type == TT::LIT_INT || peek(1).type == TT::LIT_REAL)){
+        advance();
+        LiteralPatternNode::Kind kind = check(TT::LIT_INT)
+            ? LiteralPatternNode::Kind::Int
+            : LiteralPatternNode::Kind::Real;
+        std::string value = "-" + advance().lexeme;
+        LiteralPatternNode lp{std::move(value), kind, pos};
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+    }
+
+    // булевые литералы
+    if(match(TT::LIT_YEP)){
+        LiteralPatternNode lp{"yep", LiteralPatternNode::Kind::Bool, pos};
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+    }
+
+    if(match(TT::LIT_NOPE)){
+        LiteralPatternNode lp{"nope", LiteralPatternNode::Kind::Bool, pos};
+        return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+    }
+
+    // числовые и строковые литералы
+    LiteralPatternNode::Kind kind;
+    if(check(TT::LIT_INT)) kind = LiteralPatternNode::Kind::Int;
+    else if(check(TT::LIT_REAL)) kind = LiteralPatternNode::Kind::Real;
+    else if(check(TT::LIT_STRING)) kind = LiteralPatternNode::Kind::String;
+    else return std::unexpected(makeError("expected literal pattern"));
+
+    std::string value = advance().lexeme;
+    LiteralPatternNode lp{std::move(value), kind, pos};
+    return std::make_unique<PatternNode>(PatternNode{std::move(lp), pos});
+}
 
 }

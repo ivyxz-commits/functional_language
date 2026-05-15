@@ -163,6 +163,7 @@ public:
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
+    std::unordered_map<std::string, sPtr<Environment>> m_moduleEnvs;
 
     //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
@@ -171,7 +172,7 @@ private:
     void analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors);
     void analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
     void analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    //типам не нужно окружение, сразу в реестр типов
+    //дата типам не нужно окружение, сразу в реестр типов
     void analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors);
     void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>&errors);
 

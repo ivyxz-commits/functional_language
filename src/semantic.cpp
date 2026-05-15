@@ -8,7 +8,7 @@ sPtr<TypeInfo> makeBuiltin(const std::string& name){
     return std::make_shared<TypeInfo>(TypeInfo{BuiltinType{name}});
 }
 
-sPtr<TypeInfo> makeSimle(const std::string& name){ 
+sPtr<TypeInfo> makeSimple(const std::string& name){ 
     return std::make_shared<TypeInfo>(TypeInfo{SimpleType{name}});
 }
 
@@ -266,33 +266,26 @@ void Analyzer::firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environme
         }
 
         else if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){ 
-            std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
-            sPtr<TypeInfo> funcType; //итоговый тип функции
+            sPtr<TypeInfo> retType;
 
+            if(fn->returnType){
+                auto rt = resolveType(**fn -> returnType, {}, errors); //optional and ptr
+                retType = rt ? *rt : makeBuiltin("unit"); //невалидный тип
+            } else {
+                errors.push_back(makeError(
+                        "function '" + fn->name + "' missing return type annotation", fn->pos));
+                continue;                
+            }
+
+            sPtr<TypeInfo> funcType;
             if(fn->params.empty()){
-                sPtr<TypeInfo> retType;
-
-                if(fn->returnType){ //Тип - просто возвращаемый тип
-                    auto rt = resolveType(**fn -> returnType, typeVarMap, errors); //optional and ptr
-                    retType = rt ? *rt : makeBuiltin("unit");
-                } else {
-                    retType = makeBuiltin("unit"); //если возвращаемый тип не указали
-                }
                 funcType = makeFunction(makeBuiltin("unit"), retType);
             } else {
-                sPtr<TypeInfo> retType; //чтобы строить цепочку справо налево (правая ассоциативность)
-
-                if(fn -> returnType){
-                    auto rt = resolveType(**fn->returnType, typeVarMap, errors);
-                    retType = rt ? *rt : makeBuiltin("unit");
-                } else {
-                    retType = makeBuiltin("unit");
-                }
-
-                funcType = retType;
+                funcType = retType; //правоассоциативность
                 bool hasError = false;
+
                 for(int i = static_cast<int>(fn->params.size()) - 1; i >= 0; i--){
-                    auto paramType = resolveType(*fn->params[i].type, typeVarMap, errors);
+                    auto paramType = resolveType(*fn->params[i].type, {}, errors);
 
                     if(!paramType){
                         hasError = true;
@@ -317,7 +310,9 @@ void Analyzer::firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environme
 
             firstPass(mod -> decls, modEnv, errors);
 
-            //m_moduleEnvs[mod -> name] = modEnv //это для будущего обращения к модулю через analyzeFieldAccess
+            //положи в словарь по ключу mod -> name значение modEnv
+            m_moduleEnvs[mod -> name] = modEnv; //это для будущего обращения к модулю через analyzeFieldAccess
+            
 
             if(!env -> define(mod -> name, Symbol{mod -> name, makeBuiltin("unit"), false, mod -> pos})){
                 errors.push_back(makeError(
@@ -462,7 +457,7 @@ void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vec
 
 
 
-//функции реализации
+//функции анализации
 //analyzeFuncDecl - проверка тела функции
 void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto funcEnv = std::make_shared<Environment>(env); 
@@ -474,14 +469,14 @@ void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::v
         auto paramType = resolveType(*param.type, {}, errors); //просто также пустоту передали, так как в таблице и так ничего не будет
         if(!paramType) continue; //ошибку уже добавили
 
-        if(!funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos}));
+        if(!funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos}))
         errors.push_back(makeError(
             "parameter '" + param.name + "' is already declared", param.pos));
     }
 
     auto symbol = env->lookup(fn.name); //function name
     if(symbol){
-        funcEnv -> define(fn.name, *symbol);
+        funcEnv -> define(fn.name, *symbol); //в свое локальное окружение для рекурсии
     } else {
         errors.push_back(makeError(
             "function '" + fn.name + "' not found in environment", fn.pos));
@@ -489,8 +484,80 @@ void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::v
 
     //проверка тела функции
     auto bodyType = analyzeExpr(*fn.body, funcEnv, errors);
-    //etc
+    if(bodyType){
+        auto expectedType = resolveType(**fn.returnType, {}, errors);
+        if(expectedType && !typesCompatible(**bodyType, **expectedType)){
+            errors.push_back(makeError(
+                "function '" + fn.name + "'body type '" + 
+                (*bodyType)->toString() + "'does not match declared return type '" + 
+                (*expectedType)->toString() + "'", fn.pos));
+        }
+    } 
 }
+
+//type Name = unknownType - прекратим выполнение функции без регстрации псевдонима
+void Analyzer::analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>& errors){
+    auto resolved = resolveType(*alias.type, {}, errors);
+    if(!resolved) return;
+
+    if(!m_registry.registerAlias(alias.name, *resolved)){
+        errors.push_back(makeError(
+            "type alias '" + alias.name + "' is already declared", alias.pos));
+    }
+}
+
+
+void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors){
+    DataTypeInfo info; //информацию собираем о дата-типе
+
+    info.name = data.name; //data Option[a] = //info.name = "Option"
+    info.typeParams = data.typeParams;
+
+
+    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+    //тут пригодится таблица параметров типа для разрешения полей конструктора
+    for(const auto& tp : data.typeParams){
+        typeVarMap[tp] = makeSimple(tp); //не неизвестный тип, а simpleType
+    }
+
+    for(const auto& ctor : data.constructors){
+        ConstructorInfo ctorInfo;
+        ctorInfo.name = ctor.name; 
+        ctorInfo.dataName = data.name; //имя дата типа которому принадлежит конструктор
+        ctorInfo.isNamed = ctor.isNamed;
+
+        for(const auto& field : ctor.fields){
+            auto fieldType = resolveType(*field.type, typeVarMap, errors);
+            if(!fieldType) continue; //если тип не удалось разрешить
+            ctorInfo.fieldTypes.push_back(*fieldType);
+            ctorInfo.fieldNames.push_back(field.name);
+        }
+
+        info.constructors.push_back(std::move(ctorInfo));
+    }
+
+    if(!m_registry.registerData(std::move(info))){
+        errors.push_back(makeError(
+            "type '" + data.name + "' is already declared", data.pos));
+    }
+}
+
+void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    auto it = m_moduleEnvs.find(mod.name);
+    if(it == m_moduleEnvs.end()){
+        errors.push_back(makeError(
+            "module '" + mod.name + "' not found in registry", mod.pos));
+        return;
+    }
+
+    auto modEnv = it->second;
+
+    //второй проход - проверяем тела всех объявлений внутри модуля
+    for(const auto& decl : mod.decls){
+        analyzeDecl(*decl, modEnv, errors);
+    }
+}
+
 
 
 
