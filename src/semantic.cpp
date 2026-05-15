@@ -559,6 +559,75 @@ void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, s
 }
 
 
+//анализатор выражений
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
+    const ExprNode& expr, sPtr<Environment> env, std::vector<SemanticError>& errors){
+        
+    if(const auto* e = std::get_if<LiteralExpr>(&expr.var)){
+        if(std::get_if<long long>(&e->value)) return makeBuiltin("int64");
+        if(std::get_if<double>(&e->value)) return makeBuiltin("float64");
+        if(std::get_if<std::string>(&e->value)) return makeBuiltin("string");
+        if(std::get_if<bool>(&e->value)) return makeBuiltin("bool");
+        if(std::get_if<std::monostate>(&e->value)) return makeBuiltin("unit");
+        return std::nullopt; //__builtin_unreachable - так как если попали в эту секцию возьмем один из вариантов
+    }
+
+    if(const auto* e = std::get_if<IdentExpr>(&expr.var)){
+        auto symbol = env->lookup(e->name);
+        if(!symbol){
+            errors.push_back(makeError(
+                "undefined variable '" + e->name + "'", e->pos));
+            return std::nullopt;
+        }
+        return symbol->type; //тип идентификатора возвращаем
+    }
+
+    if(const auto* e = std::get_if<UnaryExpr>(&expr.var)){
+        return analyzeUnary(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<BinaryExpr>(&expr.var)){
+        return analyzeBinary(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<CallExpr>(&expr.var)){
+        return analyzeCall(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
+        return analyzeFieldAccess(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<IfExpr>(&expr.var)){
+        return analyzeIf(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<MatchExpr>(&expr.var)){
+        return analyzeMatch(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<LetInExpr>(&expr.var)){
+        return analyzeLetIn(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<LambdaExpr>(&expr.var)){
+        return analyzeLambda(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<TupleExpr>(&expr.var)){
+        return analyzeTuple(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<ListExpr>(&expr.var)){
+        return analyzeList(*e, env, errors);
+    }
+
+    if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
+        return analyzeConstructor(*e, env, errors);
+    }
+
+    return std::nullopt;
+}
 
 
 }

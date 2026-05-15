@@ -201,7 +201,7 @@ private:
 
     //разбор выражений (тип выажения или nullopt)
     std::optional<sPtr<TypeInfo>> analyzeExpr(const ExprNode&, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeLeIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeLetIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeIf(const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeMatch(const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeLambda(const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
@@ -210,6 +210,8 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeFieldAccess(const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeCall(const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeTuple(const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+        std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     //вспомогательные функции
     //функции проверки типов
