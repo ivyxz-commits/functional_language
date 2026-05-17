@@ -3,4 +3,15 @@ fn main() -> int64 =
     let b = 123@ in
     let c = "unclosed in
     let d = 1.5eX in
-    a + b
+    a + b 
+
+//include errors
+
+
+data Shape = Circle(float64) | Rect(float64, float64)
+
+fn area(s: Shape) -> float64 =
+    match s {
+        Circle(r) -> r * r,
+        Rect(w, h) -> w * h
+    }

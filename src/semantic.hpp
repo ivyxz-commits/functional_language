@@ -211,7 +211,7 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeCall(const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeTuple(const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-        std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     //вспомогательные функции
     //функции проверки типов

@@ -887,4 +887,114 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
 }
 
 
+//analyzeMatch //все ветки одного типа, паттерны(шаблоны, образцы) совместимы с типом
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
+    const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    //тип сопоставляемого значения || match x {...} где x - exprNode
+    auto targetType = analyzeExpr(*e.target, env, errors);
+    if(!targetType) return std::nullopt;
+
+    std::optional<sPtr<TypeInfo>> resultType;
+
+    for(const auto& arm : e.arms){
+        //создаем новую область для каждой ветки // Circle(r) -> r * r - r видно только когда shape - circle
+        auto armEnv = std::make_shared<Environment>(env);
+
+        analyzePattern(*arm.pattern, *targetType, armEnv, errors); //проверяем образец, связываем имя - 643 ожидает только литерал (не ctor) 
+
+        //само тело ветви от '->' справа
+        auto bodyType = analyzeExpr(*arm.body, armEnv, errors);
+        if(!bodyType) continue;
+
+        if(!resultType){
+            resultType = bodyType; //если первая типизированная ветка, то храним ее как ожидаемый тип
+        } else if(!typesCompatible(**resultType, **bodyType)){
+            errors.push_back(makeError(
+                "match arms have different types: " + 
+                (*resultType)->toString() + "' and '" + 
+                (*bodyType)->toString() + "'", arm.pos));
+        }
+    }
+
+    return resultType;
+}
+
+
+//analyze Let in
+
+ std::optional<sPtr<TypeInfo>> Analyzer::analyzeLetIn(
+    const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto letEnv = std::make_shared<Environment>(env);
+    
+    for(const auto& binding : e.bindings){
+
+        //то, что справа от =
+        //let x: int64 = 5 + 3 in x BinaryExpr -> analyzeBinary -> int64
+        auto valueType = analyzeExpr(*binding.value, letEnv, errors); 
+        if(!valueType) continue;
+
+        if(binding.type){
+            auto annotationType = resolveType(**binding.type, {}, errors);
+            if(annotationType && !typesCompatible(**valueType, **annotationType)){
+                errors.push_back(makeError(
+                    "let binding '" + binding.name + "': value type '" + (*valueType)->toString() + 
+                    "'  does not match annotation '" + (*annotationType)->toString() + "'", binding.pos));
+                continue;
+            }
+        }
+
+        //let x = 5, x = 10 in x
+        if(!letEnv->define(binding.name, Symbol{binding.name, *valueType, false, binding.pos})){
+            errors.push_back(makeError(
+                "'" + binding.name + "' is already declared in this scope", binding.pos));
+            continue;
+        }
+    }
+
+    return analyzeExpr(*e.body, letEnv, errors); //передаем внутреннее выражение
+}
+
+
+//analyzeLambda
+ std::optional<sPtr<TypeInfo>>Analyzer::analyzeLambda(
+    const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto LambdaEnv = std::make_shared<Environment>(env); //let add = \x : int64 -> x + 1 i add(5)
+
+    std::vector<sPtr<TypeInfo>> paramTypes;
+    for(const auto& param : e.params){
+
+        if(!param.type){
+            errors.push_back(makeError(
+                "lambda parameter \'" + param.name + 
+                "\' requires a type annotation, for exapmle \\" + param.name + ": int64 -> ...", param.pos));
+            return std::nullopt;
+        }
+
+        auto paramType = resolveType(**param.type, {}, errors);
+        if(!paramType) return std::nullopt; //не можем построит тип лямбды
+
+        paramTypes.push_back(*paramType);
+        if(!LambdaEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos})){
+            errors.push_back(makeError(
+                "parameter '" + param.name + "' is already declared", param.pos));
+            return std::nullopt;
+        }
+    }
+
+    auto bodyType = analyzeExpr(*e.body, LambdaEnv, errors);
+    if(!bodyType) return std::nullopt; //не можем определить, что возвращает
+
+    //идем справа налево, что получили, что возвратили
+    sPtr<TypeInfo> funcType = *bodyType;
+    //так как лямбда это функция, то ее тип должен быть FunctionType
+    for(int i = static_cast<int>(paramTypes.size()) - 1; i >= 0; i--){
+        funcType = makeFunction(paramTypes[i], funcType); //первый проход там bodyType
+    }
+
+    return funcType; // -> ... -> ... -> ......
+}
+
 }
