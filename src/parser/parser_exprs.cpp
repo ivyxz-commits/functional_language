@@ -246,7 +246,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseMultiplicative(){
         switch(current().type){ 
             case TT::OP_STAR : op = BinaryOp::Mul; break;
             case TT::OP_SLASH: op = BinaryOp::Div; break;
-            case TT::OP_PERCENT: op = BinaryOp::Mul; break;
+            case TT::OP_PERCENT: op = BinaryOp::Mod; break;
             default: op = BinaryOp::Mul; //недостижима, как заглушка 
         }
         advance();

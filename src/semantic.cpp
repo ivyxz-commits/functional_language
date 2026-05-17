@@ -121,6 +121,25 @@ std::string TypeInfo::toString() const{
     return "<unknown>";
 }
 
+std::string Analyzer::binaryOpToString(Parser::BinaryOp op){
+    switch(op){
+        case BinaryOp::Add: return "+";
+        case BinaryOp::Sub: return "-";
+        case BinaryOp::Mul: return "*";
+        case BinaryOp::Div: return "/";
+        case BinaryOp::Mod: return "%";
+        case BinaryOp::Eq: return "==";
+        case BinaryOp::Neq: return "!=";
+        case BinaryOp::Lt: return "<";
+        case BinaryOp::Le: return "<=";
+        case BinaryOp::Gt: return ">";
+        case BinaryOp::Ge: return ">=";
+        case BinaryOp::And: return "and";
+        case BinaryOp::Or: return "or";
+    }
+    __builtin_unreachable();
+}
+
 
 //окружение
 Environment::Environment(sPtr<Environment> parent) : m_parent(std::move(parent)){}
@@ -691,14 +710,181 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeUnary(
 
 
 //analyzeBinary
+
+/*
+*fn add(x: int64, y: int64) -> int64 = x + y;
+*/
+
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
     const BinaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
         
     auto leftType = analyzeExpr(*e.left, env, errors);
     auto rightType = analyzeExpr(*e.right, env, errors);
     if(!leftType || !rightType) return std::nullopt; //неизвестная переменная, невалидный вызов функции, вложенная ошибка
+
+    //арифметические операторы
+    if(e.op == BinaryOp::Add || e.op == BinaryOp::Sub || e.op == BinaryOp::Mul ||
+        e.op == BinaryOp::Div || e.op == BinaryOp::Mod){
+        
+        if(!isNumericType(**leftType)){
+            errors.push_back(makeError(
+                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
+                (*leftType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        if(!typesCompatible(**leftType, **rightType)){
+            errors.push_back(makeError(
+                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                (*leftType)->toString() + "' and '" + 
+                (*rightType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return *leftType; //тип левого так как оба уже проверили
+    }
+
+    if(e.op == BinaryOp::Lt || e.op == BinaryOp::Le ||
+        e.op == BinaryOp::Ge || e.op == BinaryOp::Gt){
+            
+        if(!isNumericType(**leftType)){ 
+            errors.push_back(makeError(
+                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
+                (*leftType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+            //со строками - лексикографически не вижу пока смысла работать
+
+        if(!typesCompatible(**leftType, **rightType)){
+            errors.push_back(makeError(
+                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                (*leftType)->toString() + "' and '" + 
+                (*rightType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin("bool");
+    }
+
+    if(e.op == BinaryOp::Eq || e.op == BinaryOp::Neq){
+        
+        if(!typesCompatible(**leftType, **rightType)){
+            errors.push_back(makeError(
+                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                (*leftType)->toString() + "' and '" + 
+                (*rightType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return std::nullopt;
+    }
+
+    //логические операторы
+    if(e.op == BinaryOp::And || e.op == BinaryOp::Or){
+
+
+        if(!isBoolType(**leftType)){
+            errors.push_back(makeError(
+                "'" + binaryOpToString(e.op) + "' requires bool, got '" + 
+                (*leftType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        if(!isBoolType(**rightType)){
+            errors.push_back(makeError(
+                "'" + binaryOpToString(e.op) + "' requires bool, got '" + 
+                (*rightType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin("bool");
+    }
+
+    return std::nullopt;
 }
 
+
+//analyzeCall 
+//Для вызываемой функции 
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
+    const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto calleeType = analyzeExpr(*e.callee, env, errors); //возвратит тип add(1, 2) IdentExpr("add") - в окружении найдет add с типом
+    if(!calleeType) return std::nullopt;
+
+    auto currentType = *calleeType; //передаем имя вызываемой функции
+
+    //каждый аргумент вызываемой функции сопоставляется с полностью прописанной версией функции
+    for(const auto& arg : e.args){ //каждый аргумент || x: int64, flag: bool smth(50, nope)
+        auto* funcType = std::get_if<FunctionType>(&currentType->var); //functype = makeFunction(int64, makeFunct(int64, int64))
+        if(!funcType){
+            errors.push_back(makeError(
+                "'" + (*calleeType)->toString() + "' is not a function and can`t be callled", e.pos));
+            return std::nullopt;
+        }
+
+        auto argType = analyzeExpr(*arg, env, errors);
+        if(!argType) return std::nullopt; //тип аргумента не удалось получить
+    
+        if(!typesCompatible(*funcType->from, **argType)){
+            errors.push_back(makeError(
+                "argument type '" + (*argType)->toString() + 
+                "' does not match expected type '" + 
+                funcType->from->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        currentType = funcType->to;
+    }
+
+    return currentType;
+}
+
+//если Math.add(1, 2) - identexpr, fieldaccess, callee
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
+    const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto objType = analyzeExpr(*e.object, env, errors); //Math в примере Math.add
+    if(!objType) return std::nullopt;
+
+    if(const auto* ident = std::get_if<IdentExpr>(&e.object->var)){
+        auto it = m_moduleEnvs.find(ident->name);
+        if(it != m_moduleEnvs.end()){
+            auto symbol = it->second->lookupLocal(e.field); //add
+            if(!symbol){
+                errors.push_back(makeError(
+                    "module '" + ident->name + "' has no member '" + e.field + "'", e.pos));
+                return std::nullopt;
+            }
+            return symbol->type; //вернется тип для последующего сравнения
+        }
+    }
+
+    //иначе обычный доступ к полю именнованного конструктора
+    //если это псевдоним, то раскрываем до настоящего типа
+    auto resolved = m_registry.resolveAlias(*objType);
+
+    if(const auto* st = std::get_if<SimpleType>(&resolved->var)){
+        auto data = m_registry.lookupData(st->name);
+
+        if(!data) {
+            for(const auto& ctor : data->constructors){
+                if(!ctor.isNamed) continue;
+                for(int i = 0; i < ctor.fieldNames.size(); i++){
+                    if(ctor.fieldNames[i] == e.field){
+                        return ctor.fieldTypes[i];
+                    }
+                }
+            }
+        }
+    }
+
+    errors.push_back(makeError(
+            "type '" + (*objType)->toString() + "' has no field '" + e.field + "'", e.pos));
+
+    return std::nullopt;
+}
 
 
 }

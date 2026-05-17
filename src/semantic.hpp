@@ -219,6 +219,9 @@ private:
     bool isNumericType(const TypeInfo& t) const;
     bool isBoolType(const TypeInfo& t) const;
 
+    //функция для перевода оператора в строку для ошибки
+    static std::string binaryOpToString(BinaryOp op);
+
     sPtr<Environment> makeBuiltinEnv(); //создаем начальное окружение с 4 функциями (print, input, exit, panic)
     
     //регистрация всех объявлений верхнего уровня
