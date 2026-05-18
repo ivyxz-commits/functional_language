@@ -887,7 +887,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
 }
 
 
-//analyzeMatch //все ветки одного типа, паттерны(шаблоны, образцы) совместимы с типом
+//analyzeMatch //все ветки одного типа, паттерны(шаблоны, образцы) совместимые с изначальным типом
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
     const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
@@ -995,6 +995,55 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
     }
 
     return funcType; // -> ... -> ... -> ......
+}
+
+
+//analyzyConstructor
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
+    const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    auto ctorInfo = m_registry.lookupConstructor(e.name);
+
+    if(!ctorInfo){
+        errors.push_back(makeError(
+            "' unknown constructor '" + e.name + "'", e.pos));
+        return std::nullopt;
+    }
+
+    //количество аргументов в конструкторе
+    if(e.args.size() != ctorInfo->fieldTypes.size()){
+        errors.push_back(makeError(
+            "' constructor " + e.name + "expects " + 
+            std::to_string(ctorInfo -> fieldTypes.size()) + "argument(s), got " + 
+            std::to_string(e.args.size()), e.pos));
+
+        return std::nullopt;
+    }
+    
+    //если ADT параметизирован, то есть присутсвует Generic, пока пропускаем это более сложная реализация
+    auto dataInfo = m_registry.lookupData(ctorInfo->dataName);
+    bool isGeneric = dataInfo && !dataInfo -> typeParams.empty();
+
+    if(isGeneric){
+        for(int i = 0; i < e.args.size(); i++){
+            analyzeExpr(*e.args[i], env, errors); //тип определить не может, проверка на корректность аргументов выражения 
+        }
+    } else {
+        for(std::size_t i = 0; i < e.args.size(); i++){
+            auto argType = analyzeExpr(*e.args[i], env, errors);
+            if(!argType) continue; 
+
+            if(!typesCompatible(**argType, *ctorInfo->fieldTypes[i])){
+                errors.push_back(makeError(
+                    "constructor '" + e.name + "' argument " + 
+                    std::to_string(i + 1) + " has type '" + 
+                    (*argType)->toString() + "', expected '" + 
+                    ctorInfo->fieldTypes[i] -> toString() + "'", e.pos));
+            }
+        }
+
+        return makeSimple(ctorInfo -> dataName);
+    }
 }
 
 }
