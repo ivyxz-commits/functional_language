@@ -868,7 +868,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
     if(const auto* st = std::get_if<SimpleType>(&resolved->var)){
         auto data = m_registry.lookupData(st->name);
 
-        if(!data) {
+        if(data) {
             for(const auto& ctor : data->constructors){
                 if(!ctor.isNamed) continue;
                 for(int i = 0; i < ctor.fieldNames.size(); i++){
@@ -1025,9 +1025,13 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
     bool isGeneric = dataInfo && !dataInfo -> typeParams.empty();
 
     if(isGeneric){
+
         for(int i = 0; i < e.args.size(); i++){
             analyzeExpr(*e.args[i], env, errors); //тип определить не может, проверка на корректность аргументов выражения 
         }
+
+        return makeSimple(ctorInfo -> dataName);
+
     } else {
         for(std::size_t i = 0; i < e.args.size(); i++){
             auto argType = analyzeExpr(*e.args[i], env, errors);
@@ -1045,5 +1049,50 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
         return makeSimple(ctorInfo -> dataName);
     }
 }
+
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeTuple(
+    const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){ 
+
+    std::vector<sPtr<TypeInfo>> elemTypes;
+    bool hasError = false;
+
+    for(const auto& elem : e.elems){
+        auto t = analyzeExpr(*elem, env, errors);
+        if(!t){
+            hasError = true;
+            continue;
+        }
+        elemTypes.push_back(*t);
+    }
+
+    if(hasError) return std::nullopt;
+    return makeTuple(std::move(elemTypes));
+    
+}
+
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
+    const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    if(e.elems.empty()) return makeList(makeBuiltin("unit"));
+
+    auto firstType = analyzeExpr(*e.elems[0], env, errors);
+    if(!firstType) return std::nullopt;
+
+    for(std::size_t i = 1; i < e.elems.size(); i++){
+        auto t = analyzeExpr(*e.elems[i], env, errors);
+        if(!t) return std::nullopt;
+
+        if(!typesCompatible(**firstType, **t)){
+            errors.push_back(makeError(
+                "list elements have inconsistent type: '" +
+                (*firstType)->toString() + "' and '" + 
+                (*t)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+    }        
+}
+
 
 }
