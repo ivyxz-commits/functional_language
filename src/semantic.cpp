@@ -1095,4 +1095,176 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
 }
 
 
+bool Analyzer::analyzePattern(
+    const PatternNode& pattern, sPtr<TypeInfo> expectedType, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    //expected type - match x, пусть x заранее в функции определен как x : int64, тогда ожидаемый тип int64    
+
+    //wildcard
+    if(std::get_if<WildcardPatternNode>(&pattern.var)){
+        return true;
+    }
+
+    //literal
+    if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){
+        sPtr<TypeInfo> litType;
+
+        switch(p->kind){
+            case LiteralPatternNode::Kind::Int: litType = makeBuiltin("int64"); break;
+            case LiteralPatternNode::Kind::Real: litType = makeBuiltin("float64"); break;
+            case LiteralPatternNode::Kind::String: litType = makeBuiltin("string"); break;
+            case LiteralPatternNode::Kind::Bool: litType = makeBuiltin("bool"); break;
+        }
+
+        if(!typesCompatible(*expectedType, *litType)){
+            errors.push_back(makeError(
+                "literal pattern type '" + litType->toString() + 
+                "' does not match target type '" + expectedType->toString() + "'", p->pos));
+            return false;
+        }
+
+        return true;
+    }
+
+    //одно имя - одно связывание 
+
+    /* 
+    *match(1, 2){
+        *(x, x) -> x + 1; //возникает неоднозначность, функц. языки - одно имя в паттерне
+    *}
+    */
+
+    //для рассмотрения имен рекурсивно в кортеже и списке
+    if(const auto* p = std::get_if<NamePatternNode>(&pattern.var)){
+        if(env -> lookupLocal(p->name)){
+            errors.push_back(makeError(
+                "variable '" + p->name + "' is already bound in this pattern", p->pos));
+            return false;
+        }
+
+        env->define(p->name, Symbol{p->name, expectedType, false, p->pos});
+        return true;
+    }
+
+    if(const auto* p = std::get_if<TuplePatternNode>(&pattern.var)){
+        auto* tupleType = std::get_if<TupleType>(&expectedType->var); //указатель на ожидаемый тип
+
+        if(!tupleType){
+            errors.push_back(makeError(
+                "tuple pattern does not match '" + expectedType->toString() + 
+                "'", p->pos));
+            return false;
+        }
+
+        if(p->elems.size() != tupleType->elems.size()){
+            errors.push_back(makeError(
+                "tuple pattern has " + std::to_string(p->elems.size()) + 
+                " element(s), but type has " + std::to_string(tupleType->elems.size()), p->pos));
+            return false;
+        }
+
+        bool ok = true;
+        for(std::size_t i = 0; i < p->elems.size(); i++){
+            if(!analyzePattern(*p->elems[i], tupleType->elems[i], env, errors)){
+                ok = false;
+            }
+        }
+
+        return ok;
+    }
+
+    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){ 
+        auto listType = std::get_if<ListType>(&expectedType->var);
+
+        if(!listType){
+            errors.push_back(makeError(
+                "list pattern does not match '" + expectedType->toString() + 
+                "'", p->pos));
+            return false;
+        }
+
+        bool ok = true;
+        for(std::size_t i = 0; i < p->elems.size(); i++){
+            if(!analyzePattern(*p->elems[i], listType->elem, env, errors)){
+                ok = false;
+            }
+        }
+
+        return ok;
+    }
+
+
+    //cons x : xs 
+
+    /* 
+    *fn sum(xs: [int64]) -> int64 = match xs {
+    *    [] -> 0,
+    *    x : rest -> x + sum(rest) }
+    */
+
+    if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
+        auto* listType = std::get_if<ListType>(&expectedType->var);
+        if(!listType){
+            errors.push_back(makeError(
+                "cons pattern does not match '" + expectedType->toString() + 
+                "'", p->pos));
+            return false;
+        }
+
+        bool ok = analyzePattern(*p->head, listType->elem, env, errors); //тип элемента списка
+        ok = analyzePattern(*p->tail, expectedType, env, errors) && ok;
+        return ok;
+    }
+
+    //обработка конструктора ADT | Some(x), None, Circle(r)
+    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var)){
+        auto ctorInfo = m_registry.lookupConstructor(p->name); //существует вообще? //ctorInfo - общий вид
+        if(!ctorInfo){
+            errors.push_back(makeError(  //несуществующий конструктор в паттерне
+                "unknown constructor '" + p->name + "'", p->pos));
+            return false;
+        }
+
+        auto resolvedExpected = m_registry.resolveAlias(expectedType); //type MyShape = Shape
+
+        if(const auto* st = std::get_if<SimpleType>(&resolvedExpected->var)){ //принадлежность нужному типу
+            if(st->name != ctorInfo->dataName){
+                errors.push_back(makeError(
+                    "constructor '" + p->name + "' belongs to type '" + 
+                    ctorInfo->dataName + "' but target has type '" + 
+                    expectedType -> toString() + "'", p->pos));
+                return false;
+            }
+        } else if (const auto* gt = std::get_if<GenericType>(&resolvedExpected->var)){
+            if(gt->name != ctorInfo->dataName){
+                errors.push_back(makeError(
+                    "constructor '" + p->name + "' belongs to type '" + 
+                    ctorInfo->dataName + "' but target has type '" + 
+                    expectedType -> toString() + "'", p->pos));
+                return false;
+            }
+        }
+
+        if(p->args.size() != ctorInfo->fieldTypes.size()){
+            errors.push_back(makeError(
+                "constructor '" + p->name + "' has " + 
+                std::to_string(ctorInfo->fieldTypes.size()) + 
+                " field(s) but pattern has" + std::to_string(p->args.size()), p->pos));
+                return false;
+        }
+
+        //Рекурсивно проверяем аргументы
+        bool ok = true;
+        for(std::size_t i = 0; i < p->args.size(); i++){
+            if(!analyzePattern(*p->args[i], ctorInfo->fieldTypes[i], env, errors)){
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    __builtin_unreachable(); //все случаи это variant из фиксированного набора типов - один всегда есть
+}
+
+
+
 }
