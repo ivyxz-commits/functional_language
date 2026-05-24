@@ -290,7 +290,87 @@ void CodeGenerator::emitPrintInt(){
     m_text << "    ret\n\n";
 }
 
+//парсинг интов и реализацию вещественных чисел буду прописывать позже
+//плюсом еще добавим аллокатор для грамотной работы с памятью
 
 
+//начинаем реализовать основу, остальные отдельные моменты будут прописаны позже
+//Declarations
+void CodeGenerator::genDecl(const DeclNode& decl){
+    if(const auto* fn = std::get_if<FuncDecl>(&decl.var)){
+        genFuncDecl(*fn);
+    } else if(const auto* mod = std::get_if<ModuleDecl>(&decl.var)){ 
+        genModuleDecl(*mod);
+    }
+
+    //TypeAliasDecl и DataDecl - типы и кода не генерируют
+}
+
+void CodeGenerator::genModuleDecl(const ModuleDecl& mod){
+    for(const auto& decl : mod.decls){ //объявление может быть и сам модуль
+        genDecl(*decl);
+    }
+}
+
+
+//нужен точный размер стека - std::swap - based on move semantics //по факту один умный проход
+void CodeGenerator::genFuncDecl(const FuncDecl& fn){
+    FuncContext ctx;  //контекст текущей функции - локальные переменные, offsets, размеры стека
+    ctx.name = fn.name;
+
+    emitLabel("__fn_" + fn.name);
+    emit("push rbp");
+    emit("mov rbp, rsp");
+    
+    //сохраняем основной поток и генерируем тело во временный //через genExpr бы не смогли, он бы сразу генерировал код
+    std::ostringstream bodyStream;
+    std::swap(m_text, bodyStream); //m_text теперь пустой, а в bodyStream уже сохраняли стек и написали имя функции
+    //пишем все в m_text
+
+    for(int i; i < fn.params.size() && i < 6; i++){
+        int off = ctx.allocLocal(fn.params[i].name); //nextOffset -=8
+        emit("mov [rbp" + std::to_string(off) + "], " + std::string(argReg(i))); //вызывающая функция позаботиться
+    }
+
+    for(int i = 6; i < fn.params.size(); i++){
+        int stackArgOffset = 16 + (i - 6) * 8;
+
+        int off = ctx.allocLocal(fn.params[i].name);
+        emit("mov [rbp" + std::to_string(stackArgOffset) + "]");
+
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+    }
+
+    genExpr(*fn.body, ctx); //выражения, результат в rax
+
+    emit("mov rsp, rbp");
+    emit("pop rbp");
+    emit("ret");
+
+    std::string body = m_text.str(); //сохраняем сгенерированное тело
+    std::swap(m_text, bodyStream); //body stream содержит все, что содержалось в функции
+
+    int stackSize = ctx.alignedStackSize();
+
+    if(stackSize > 65536){ //64KB
+        throw std::runtime_error(
+            "codegen internal error: stack frame too large (" + 
+            std::to_string(stackSize) + ") in function '" + fn.name + "'");
+    }
+
+    /* но все реализовано верно
+    *if(stackSize < 0){
+    *    throw std::runtime_error(
+    *    "codegen internal error: negative stack size in function '" + fn.name + "'");   
+    }
+    */
+
+    if(stackSize > 0){
+        emit("sub rsp, " + std::to_string(stackSize));
+    }
+
+    m_text << body;
+    m_text << "\n";
+}
 
 }
