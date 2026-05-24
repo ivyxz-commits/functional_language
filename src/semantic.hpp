@@ -160,6 +160,8 @@ public:
     Analyzer(std::string filename = "<input>");
     std::vector<SemanticError> analyze(const Program& prog); //если вектор пустой, то все прекрасно с семантической точки зрения
 
+    const TypeRegistry& get_registry() const {return m_registry;}
+
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
