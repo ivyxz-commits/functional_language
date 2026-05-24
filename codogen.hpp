@@ -83,8 +83,12 @@ private:
 
     //utilities
 
+    //работа с метками
     std::string freshLabel(const std::string& label = "L"); //.L_0, .L_1, ...
     std::string freshStrLabel();
+    void emit(const std::string& line);
+    void emitData(const std::string& line);
+    void emitLabel(const std::string& line);
 
     //declarations
     void genDecl(const DeclNode& decl);
@@ -111,11 +115,17 @@ private:
     void genPattern(const PatternNode& pattern, const std::string& valueReg, //target
                     const std::string& failLabel, FuncContext& ctx); //failLabel - метка следующей ветки match
 
+    //замыкания
+    std::string genLambdaFunc(const LambdaExpr& e, const std::vector<std::string>& captured, FuncContext& outer);
+    std::vector<std::string> findFreeVars(const LambdaExpr& e, const FuncContext& ctx) const; // \y -> x + y ==> x - free, берем, например, из let
+
+    //ABI
+    static const char* argReg(int i); //rdi, rsi
+    void emitAlloc(int size); //память в куче через mmap
     
-
-}
-
-
-
+    //пара временного хранения - допустим и левая и правая часть выражения хотят его использовать
+    int pushToStack(FuncContext& ctx, const std::string& label = "__tmp"); //rax во временную переменную на стеке
+    int loadFromStack(int offset, const std::string& destReg = "rax");
+};
 
 }
