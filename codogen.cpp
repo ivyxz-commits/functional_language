@@ -373,4 +373,64 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     m_text << "\n";
 }
 
+//expressions
+void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
+
+    if(const auto* e = std::get_if<LiteralExpr>(&expr.var)){
+        genLiteral(*e, ctx);
+    }
+    
+    else if (const auto* e = std::get_if<IdentExpr>(&expr.var)){
+        genIdent(*e, ctx);
+    } 
+    
+    else if (const auto* e = std::get_if<UnaryExpr>(&expr.var)){
+        genUnary(*e, ctx);
+    }
+    
+    else if (const auto* e = std::get_if<BinaryExpr>(&expr.var)){
+        genBinary(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<CallExpr>(&expr.var)){
+        genCall(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<IfExpr>(&expr.var)){
+        genIf(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<MatchExpr>(&expr.var)){
+        genMatch(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<LetInExpr>(&expr.var)){
+        genLetIn(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<LambdaExpr>(&expr.var)){
+        genLambda(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<TupleExpr>(&expr.var)){
+        genTuple(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<ListExpr>(&expr.var)){
+        genList(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
+        genConstructor(*e, ctx);
+    }
+
+    else if (const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
+        genFieldAccess(*e, ctx);
+    }
+}
+
+
+
+
+
 }
