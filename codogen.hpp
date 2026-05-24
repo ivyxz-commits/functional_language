@@ -81,10 +81,37 @@ private:
     const TypeRegistry& m_registry;
     int getConstructorTag(const std::string& ctorName) const;
 
+    //utilities
+
+    std::string freshLabel(const std::string& label = "L"); //.L_0, .L_1, ...
+    std::string freshStrLabel();
+
+    //declarations
+    void genDecl(const DeclNode& decl);
+    void genFuncDecl(const FuncDecl& fn);
+    void genModuleDecl(const ModuleDecl& mod);
+
+    //expressions - rax
+    void genExpr(const ExprNode& expr, FuncContext& ctx);
+    void genLiteral(const LiteralExpr& e, FuncContext& ctx);
+    void genIdent(const IdentExpr& e, FuncContext& ctx);
+    void genUnary(const UnaryExpr& e, FuncContext& ctx);
+    void genBinary(const BinaryExpr& e, FuncContext& ctx);
+    void genCall(const CallExpr& e, FuncContext& ctx);
+    void genIf(const IfExpr& e, FuncContext& ctx);
+    void genMatch(const MatchExpr& e, FuncContext& ctx);
+    void genLambda(const LambdaExpr& e, FuncContext& ctx);
+    void genLetIn(const LetInExpr& e, FuncContext& ctx);
+    void genTuple(const TupleExpr& e, FuncContext& ctx);
+    void genList(const ListExpr& e, FuncContext& ctx);
+    void genConstructor(const ConstructorExpr& e, FuncContext& ctx);
+    void genFieldAccess(const FieldAccessExpr& e, FuncContext& ctx);
+
+    //patterns matching
+    void genPattern(const PatternNode& pattern, const std::string& valueReg, //target
+                    const std::string& failLabel, FuncContext& ctx); //failLabel - метка следующей ветки match
+
     
-
-
-
 
 }
 
