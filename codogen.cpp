@@ -126,6 +126,85 @@ void CodeGenerator::emitRuntime(){
     emitExit();
 }
 
+//завершение программы с кодом возврата
+void CodeGenerator::emitExit(){
+    m_text << "__lang_exit:\n";
+    m_text << "    mov rax, 60\n"; //ядро линукс уничтожает процесс и всю его память
+    m_text << "    syscall\n\n";
+}
+
+//аварийное завершение с сооьщение об ошибке
+void CodeGenerator::emitPanic(){
+    m_text << "__lang_panic:\n";
+    m_text << "    push rbp\n";
+    m_text << "    mov rbp, rsp\n";
+    m_text << "    call __lang_print_str\n"; //печатаем нашу ошибку
+    m_text << "    mov rdi, 1\n"; //код ошибки, что-то пошло не так
+    m_text << "    mov rax, 60\n";
+    m_text << "    syscall\n\n";
+}
+
+//rdi: str* -> unit
+//str* = {int64 length; char data[]}
+    void CodeGenerator::emitPrintString(){
+    m_text << "__lang_print_str:\n";
+    m_text << "    push rbp\n";
+    m_text << "    mov rbp, rsp\n";
+    m_text << "    push rbx\n"; //saved
+    m_text << "\n";
+    m_text << "    mov rbx, rdi\n"; //указатель на строку
+    m_text << "    mov rdx, [rbx]\n"; //длина
+    m_text << "    lea rsi, [rbx + 8]\n"; //сами данные
+    m_text << "    mov rax, 1\n"; //syscall write
+    m_text << "    mov rdi, 1\n"; //stdout
+    m_text << "    syscall\n";
+    m_text << "\n";
+    m_text << "    pop rbx\n";
+    m_text << "    pop rbp\n";
+    m_text << "    ret\n\n";
+}
+
+//чтение строки из stdin возвращает rax
+void CodeGenerator::emitReadString(){
+    m_text << "__lang_read_str:\n";
+    m_text << "    push rbp\n";
+    m_text << "    mov rbp, rsp\n";
+    m_text << "    push rbx\n";
+    m_text << "\n";
+    m_text << "    mov rax, 0\n"; //syscall read
+    m_text << "    mov rdi, 0\n";
+    m_text << "    mov rsi, __read_buf\n"; // буфер
+    m_text << "    mov rdx, 4095\n"; // \0
+    m_text << "    syscall\n";
+    m_text << "    mov rbx, rax\n"; // rbx = прочитано байт
+    m_text << "\n";
+    m_text << "    ; убираем завершающий '\\n' если есть\n";
+    m_text << "    cmp rbx, 0\n";
+    m_text << "    jz .rstr_alloc\n";
+    m_text << "    mov rcx, __read_buf\n";
+    m_text << "    add rcx, rbx\n";
+    m_text << "    dec rcx\n"; // rcx = адрес последнего байта
+    m_text << "    cmp byte [rcx], 10\n";
+    m_text << "    jne .rstr_alloc\n";
+    m_text << "    dec rbx\n";
+    m_text << "\n";
+    m_text << ".rstr_alloc:\n";
+    m_text << "    mov rdi, rbx\n";
+    m_text << "    add rdi, 8\n"; // size = длина + 8 байт для length
+    m_text << "    call __lang_malloc\n"; //указатель на память в rax = ptr
+    m_text << "    mov [rax], rbx\n"; // записываем длину
+    m_text << "\n";
+    m_text << "    mov rdi, rax\n";
+    m_text << "    add rdi, 8\n"; //то, что ввел пользователь
+    m_text << "    mov rsi, __read_buf\n";
+    m_text << "    mov rcx, rbx\n";
+    m_text << "    rep movsb\n"; //копируем rcx байт из rsi to rdi
+    m_text << "\n";
+    m_text << "    pop rbx\n";
+    m_text << "    pop rbp\n";
+    m_text << "    ret\n\n";
+}
+
 
 
 

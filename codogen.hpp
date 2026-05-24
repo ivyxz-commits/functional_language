@@ -132,7 +132,7 @@ private:
 
     //ABI
     static const char* argReg(int i); //rdi, rsi
-    void emitAlloc(int size); //память в куче через mmap
+    void emitAlloc(int size); //память в куче
     
     //пара временного хранения - допустим и левая и правая часть выражения хотят его использовать
     int pushToStack(FuncContext& ctx, const std::string& label = "__tmp"); //rax во временную переменную на стеке
