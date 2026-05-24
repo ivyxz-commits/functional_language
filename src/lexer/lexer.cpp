@@ -187,7 +187,7 @@ std::expected<Token, LexError> Lexer::scanNumber(SourcePos start){
 
         if(hasExp){ 
             isReal = true;
-            advance (); //e | E
+            advance(); //e | E
 
             if(!atEnd() && (peek() == '+' || peek() == '-')){ 
                 advance();

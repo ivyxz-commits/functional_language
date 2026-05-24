@@ -88,7 +88,18 @@ private:
     std::string freshStrLabel();
     void emit(const std::string& line);
     void emitData(const std::string& line);
-    void emitLabel(const std::string& line);
+    void emitLabel(const std::string& label); //метка
+    void emitDataLabel(const std::string& label);
+
+
+    //runtime functions - генерация вспомогательного ассемблерного кода
+    void emitRuntime(); //главная функция
+    void emitMalloc(); //ADT, замыкания
+    void emitPrintInt();
+    void emitPrintString();
+    void emitReadString();
+    void emitPanic();
+    void emitExit();
 
     //declarations
     void genDecl(const DeclNode& decl);
