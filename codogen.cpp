@@ -31,6 +31,7 @@ std::string CodeGenerator::generate(const Program& prog){
     m_data << "section .data\n";
     m_bss << "section .bss\n";
     m_bss << "    __read_buf: resb 4096\n"; //read_str - input() - пустая память, не имеет значения - ОС выделяет память при запуске
+    m_bss << "    __print_int_buf: resb 24\n"; //буфер для печати целого числа Int - 19 чисел
 
     m_text << "section .text\n";
     m_text << "global _start\n\n"; //without libc
@@ -133,7 +134,7 @@ void CodeGenerator::emitExit(){
     m_text << "    syscall\n\n";
 }
 
-//аварийное завершение с сооьщение об ошибке
+//аварийное завершение с сообщением об ошибке
 void CodeGenerator::emitPanic(){
     m_text << "__lang_panic:\n";
     m_text << "    push rbp\n";
@@ -146,7 +147,7 @@ void CodeGenerator::emitPanic(){
 
 //rdi: str* -> unit
 //str* = {int64 length; char data[]}
-    void CodeGenerator::emitPrintString(){
+void CodeGenerator::emitPrintString(){
     m_text << "__lang_print_str:\n";
     m_text << "    push rbp\n";
     m_text << "    mov rbp, rsp\n";
@@ -200,6 +201,90 @@ void CodeGenerator::emitReadString(){
     m_text << "    mov rcx, rbx\n";
     m_text << "    rep movsb\n"; //копируем rcx байт из rsi to rdi
     m_text << "\n";
+    m_text << "    pop rbx\n";
+    m_text << "    pop rbp\n";
+    m_text << "    ret\n\n";
+}
+
+//выделение памяти через malloc - mmap
+//проецируем адрес физической памяти напрямую в виртуальное адресное пространство процесса
+void CodeGenerator::emitMalloc(){
+    //сообщение об ошибке в .data
+    m_data << "__malloc_err_len: dq 20\n";
+    m_data << "__malloc_err_dat: db `out of memory error`, 0\n";
+
+    m_text << "__lang_malloc:\n";
+    m_text << "    push rbp\n";
+    m_text << "    mov rbp, rsp\n";
+    m_text << "    add rdi, 7\n";  //в большую сторону
+    m_text << "    and rdi, -8\n";
+    m_text << "    mov rsi, rdi\n";
+    m_text << "    mov rdi, 0\n"; //ОС сама решит куда выделять
+    m_text << "    mov rdx, 3\n"; //читать, писать
+    m_text << "    mov r10, 34\n"; // MAP_PRIVATE | MAP_ANONYMOUS
+    m_text << "    mov r8,  -1\n";   //fd не нужен
+    m_text << "    mov r9,  0\n";    //offset = 0
+    m_text << "    mov rax, 9\n";    //syscall mmap
+    m_text << "    syscall\n";
+    m_text << "    cmp rax, -1\n";   // проверяем MAP_FAILED
+    m_text << "    jne .malloc_ok\n";
+    m_text << "    ; ошибка - выводим сообщение и завершаем\n";
+    m_text << "    mov rdi, __malloc_err_len\n";
+    m_text << "    call __lang_panic\n";
+    m_text << ".malloc_ok:\n";
+    m_text << "    pop rbp\n";
+    m_text << "    ret\n\n";
+}
+
+
+//вывод целого числа
+void CodeGenerator::emitPrintInt(){
+    m_text << "__lang_print_int:\n";
+    m_text << "    push rbp\n";
+    m_text << "    mov rbp, rsp\n";
+    m_text << "    push rbx\n";
+    m_text << "    push r12\n";
+    m_text << "    push r13\n";
+    m_text << "\n";
+    m_text << "    mov rax, rdi\n"; //число в rax
+    m_text << "    mov r12, __print_int_buf\n";  //начало буфера
+    m_text << "    add r12, 23\n";  // r12 = конец буфера
+    m_text << "    mov byte [r12], 10\n";  //'\n' в конец
+    m_text << "    dec r12\n";
+    m_text << "    mov r13, 0\n"; //флаг отрицательности
+    m_text << "\n";
+    m_text << "    cmp rax, 0\n";
+    m_text << "    jns .pint_pos\n";
+    m_text << "    mov r13, 1\n";
+    m_text << "    neg rax\n";
+    m_text << ".pint_pos:\n";
+    m_text << "    mov rbx, 10\n"; //делим на 10
+    m_text << ".pint_loop:\n";
+    m_text << "    xor rdx, rdx\n";
+    m_text << "    div rbx\n"; //rdx:rax 128 битное число 0:123 на 10, остаток в rdx
+    m_text << "    add dl, '0'\n"; //цифра в ASCII
+    m_text << "    mov [r12], dl\n";
+    m_text << "    dec r12\n"; //если цифр уже нет резервиурем место под минус, потом уберем если его нет
+    m_text << "    cmp rax, 0\n";
+    m_text << "    jnz .pint_loop\n";
+    m_text << "\n";
+    m_text << "    cmp r13, 0\n";
+    m_text << "    jz .pint_nosign\n";
+    m_text << "    mov byte [r12], '-'\n"; //добавляем минус
+    m_text << "    dec r12\n"; //чтобы минус не пропал
+    m_text << ".pint_nosign:\n";
+    m_text << "    inc r12\n"; //начало строки
+    m_text << "    mov rcx, __print_int_buf\n";
+    m_text << "    add rcx, 24\n"; // rcx = конец буфера
+    m_text << "    sub rcx, r12\n"; // длина строки, чтобы написали число с минусом или без
+    m_text << "    mov rax, 1\n";
+    m_text << "    mov rdi, 1\n";
+    m_text << "    mov rsi, r12\n"; //адрес начало строки
+    m_text << "    mov rdx, rcx\n"; //количество элементов
+    m_text << "    syscall\n";
+    m_text << "\n";
+    m_text << "    pop r13\n";
+    m_text << "    pop r12\n";
     m_text << "    pop rbx\n";
     m_text << "    pop rbp\n";
     m_text << "    ret\n\n";
