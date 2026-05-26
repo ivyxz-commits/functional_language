@@ -160,11 +160,18 @@ public:
     Analyzer(std::string filename = "<input>");
     std::vector<SemanticError> analyze(const Program& prog); //если вектор пустой, то все прекрасно с семантической точки зрения
 
-    const TypeRegistry& get_registry() const {return m_registry;}
+    const TypeRegistry& get_registry() const {
+        return m_registry;
+    }
+
+    const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& getExprTypes() const {
+        return m_exprTypes;  //поле типа для кодогена
+    }
 
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
+    std::unordered_map<const ExprNode*, sPtr<TypeInfo>> m_exprTypes;
     std::unordered_map<std::string, sPtr<Environment>> m_moduleEnvs;
 
     //Создание ошибки

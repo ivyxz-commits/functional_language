@@ -2,8 +2,10 @@
 
 namespace Codegen {
 
-CodeGenerator::CodeGenerator(std::string filename, const TypeRegistry& registry)
-    :m_filename(std::move(filename)), m_registry(registry) {}
+CodeGenerator::CodeGenerator(const TypeRegistry& registry, 
+    const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& exprTypes, std::string filename)
+
+    :m_registry(registry), m_exprTypes(exprTypes), m_filename(std::move(filename)){}
 
 
 //получение тега конструктора ADT
@@ -51,7 +53,7 @@ std::string CodeGenerator::generate(const Program& prog){
     }
 
     m_text << "_start:\n";
-    m_text << "    and rsp, -16"; //выравнивание стека без mov rbp, rsp - фрейм не надо сохранять - область использующаяся одной функцикй
+    m_text << "    and rsp, -16\n"; //выравнивание стека без mov rbp, rsp - фрейм не надо сохранять - область использующаяся одной функцикй
     m_text << "    call __fn_main\n"; //push rip + 5 адрес следующей инструкции на стек jmp __fn_main
     m_text << "    mov rdi, rax \n"; 
     m_text << "    mov rax, 60\n"; //syscall exit - код завершения в rdi
@@ -82,7 +84,7 @@ void CodeGenerator::emitLabel(const std::string& label){
 }
 
 void CodeGenerator::emitDataLabel(const std::string& label){
-    m_text << label << ":\n";
+    m_data << label << ":\n";
 }
 
 
@@ -105,15 +107,20 @@ void CodeGenerator::emitAlloc(int size){
     emit("call __lang_malloc"); //lang_malloc руками написан
 }
 
-//положить на стек и взять с него
-int CodeGenerator::pushToStack(FuncContext& ctx, const std::string& label = "__tmp"){
-    int offset = ctx.allocLocal(label); //выделили место на стеке и получили offset //+ locals | +nextOffset 
-    emit("mov [rbp" + std::to_string(offset) + "], rax");
-    return offset;
+
+//вспомогательные функции isFloat, isString
+bool CodeGenerator::isFloatExpr(const ExprNode& e) const{
+    auto it = m_exprTypes.find(&e);
+    if(it == m_exprTypes.end()) return false;
+    const auto *bt = std::get_if<BuiltinType>(&it->second->var);
+    return bt && bt ->name == "float64";
 }
 
-int CodeGenerator::loadFromStack(int offset, const std::string& destReg = "rax"){
-    emit("mov" + destReg + ", [rbp" + std::to_string(offset) + "]");
+bool CodeGenerator::isStringExpr(const ExprNode& e) const{
+    auto it = m_exprTypes.find(&e);
+    if(it == m_exprTypes.end()) return false;
+    const auto *bt = std::get_if<BuiltinType>(&it->second->var);
+    return bt && bt ->name == "string";
 }
 
 
@@ -446,16 +453,7 @@ void CodeGenerator::genIdent(const IdentExpr& e, FuncContext& ctx){
         return;
     }
 
-    //встроенные функции - рантайм написанный на ассемблере
-    if(e.name == "print"){
-        emit("mov rax, __lang_print_int"); //здесь будем определять, что именнно печатать //genCall изменим
-    } else if(e.name == "input"){
-        emit("mov rax, __lang_read_str");
-    } else if(e.name == "exit"){
-        emit("mov rax, __lang_exit"); 
-    } else if(e.name == "panic"){
-        emit("mov rax, __lang_panic");
-    }
+    //встроенных функций нет, они будут в genCall()
 }
 
 //Literals
@@ -465,21 +463,36 @@ void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
     }
 
     //вещественное число обработаем позже
+    //будем представлять наши вещественные числа как последовательность байт, rax не будет знать, что в нем лежит float
     else if(const auto* v = std::get_if<double>(&e.value)){
+    
+        double value = *v;
+        uint64_t bits = std::bit_cast<uint64_t>(value); //храним сырое представление битов
+
+        //потом addsd процессору - возьми нижние 64 бита и сложи их как double например
+
+        //для регистр <- константа нужен movabs для 64 битных
+        emit("movabs rax, " + std::to_string(bits) + " ; float64 " + std::to_string(value)); //перекидываем сырые биты в rax 
     }
 
-    //также как вещественнные позже доразбираю
+    //строка - структура {length, data[]} - длина 8, дата столько сколько влезет
     else if(const auto* v = std::get_if<std::string>(&e.value)){
-        std::string lbl = freshStrLabel(); //уникальная метка для строки
+        std::string lbl = freshStrLabel(); //уникальная метка для строки .data
 
         std::string escaped;
 
-        for(char c : *v){
+        for(char c : *v){ //db `hello`, 10, `world`, 0 - "hello\nworld"
             if(c == '\n') escaped += "`, 10, `";
             else if(c == '\\') escaped += "\\\\";
             else if(c == '"') escaped += "\\\"";
             else escaped += c;
         }
+
+        emitDataLabel(lbl + "_len");
+        emitData("dq " + std::to_string(v->size()));
+        emitDataLabel(lbl + "_dat"); //после длины следующие 8 байт
+        emitData("db `" + escaped + "`, 0"); //до байта 0 
+        emit("mov rax, " + lbl + "_len");
     }
 
     else if(const auto* v = std::get_if<bool>(&e.value)){
@@ -497,79 +510,164 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
     genExpr(*e.operand, ctx);
 
     if(e.op == UnaryOp::Neg){
-        emit("neg rax");
+        if(isFloatExpr(*e.operand)){
+            emit("movq xmm0, rax");
+            emit("mov rcx, 0x8000000000000000"); //маска для 1 старшого бита
+            emit("movq xmm1, rcx"); //8 байт за одну операцию
+            emit("xorpd xmm0, xmm1");
+        
+        
+        }    emit("neg rax");
     } else if(e.op == UnaryOp::Not){
         emit("xor rax, 1"); // 0 v 1 | 1 v 1 = false
     }
 }
 
-//чуть позже допишу
 //Binary
 void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
+    bool isFloat = isFloatExpr(*e.left) || isFloatExpr(*e.right);
+
     //левую часть на стек
     genExpr(*e.left, ctx);
+    if(isFloat) emit("movq xmm0, rax"); //доп условие вещественных чисел
     emit("push rax");
 
     genExpr(*e.right, ctx);
+    if(isFloat) emit("movq xmm1, rax");
     emit("mov rcx, rax");
     emit("pop rax"); //left
+    if(isFloat) emit("movq xmm0, rax"); //левый в xmm0
 
-    switch(e.op){
-        case BinaryOp::Add: emit("add rax, rcx"); break;
-        case BinaryOp::Sub: emit("sub rax, rcx"); break;
-        case BinaryOp::Mul: emit("imul rax, rcx"); break;
-        case BinaryOp::Div:
-            emit("cqo");
-            emit("idiv rcx"); //rax - частное
-            break;
-        case BinaryOp::Mod:
-            emit("cqo");
-            emit("idiv rcx");
-            emit("mov rax, rdx");
-            break;
-        case BinaryOp::Eq:
-            emit("cmp rax, rcx"); //ZF = 1?
-            emit("sete al"); //al = 1?
-            emit("movzx rax, al");
-            break;
-        case BinaryOp::Neq:
-            emit("cmp rax, rcx");
-            emit("setne al");
-            emit("movzx rax, al");
-            break;
-        case BinaryOp::And:
-            emit("and rax, rcx");
-            break;
-        case BinaryOp::Or:
-            emit("or rax, rcx");
-            break;
-        case BinaryOp::Lt:
-            emit("cmp rax, rcx");
-            emit("setle al");
-            emit("movzx rax, al");
-            break;
-        case BinaryOp::Le:
-            emit("cmp rax, rcx");
-            emit("setle al");
-            emit("movzx rax, al");
-            break;
-        case BinaryOp::Gt: //ZF == 0 SF == и OF
-            emit("cmp rax, rcx");
-            emit("setg al");
-            emit("movzx rax, al");
-            break;
-        case BinaryOp::Ge:
-            emit("cmp rax, rcx");
-            emit("setge al"); //127 - (-1) //10000000
-            emit("movzx rax, al");
-            break;
+    if(isFloat){
+        switch(e.op){
+            case BinaryOp::Add: emit("addsd xmm0, xmm1"); break;
+            case BinaryOp::Sub: emit("subsd xmm0, xmm1"); break;
+            case BinaryOp::Mul: emit("mulsd xmm0, xmm1"); break;
+            case BinaryOp::Div: emit("divsd xmm0, xmm1"); break;
+            case BinaryOp::Eq:
+                emit("ucomisd xmm0, xmm1");
+                emit("sete al");
+                emit("movzx rax, al");
+                return;
+            case BinaryOp::Neq:
+                emit("ucomisd xmm0, xmm1");
+                emit("setne al");
+                emit("movzx rax, al");
+                return;
+            case BinaryOp::Lt:
+                emit("ucomisd xmm0, xmm1");
+                emit("setb al");
+                emit("movzx rax, al");
+                return;
+            case BinaryOp::Le:
+                emit("ucomisd xmm0, xmm1");
+                emit("setbe al");
+                emit("movzx rax, al");
+                return;
+            case BinaryOp::Gt:
+                emit("ucomisd xmm0, xmm1"); // меняем порядок
+                emit("seta al");
+                emit("movzx rax, al");
+                return;
+            case BinaryOp::Ge:
+                emit("ucomisd xmm0, xmm1");
+                emit("setae al");
+                emit("movzx rax, al");
+                return;
+            default: break;
+        }
+        emit("movq rax, xmm0");
+    } else {
+        switch(e.op){
+            case BinaryOp::Add: emit("add rax, rcx"); break;
+            case BinaryOp::Sub: emit("sub rax, rcx"); break;
+            case BinaryOp::Mul: emit("imul rax, rcx"); break;
+            case BinaryOp::Div:
+                emit("cqo");
+                emit("idiv rcx"); //rax - частное
+                break;
+            case BinaryOp::Mod:
+                emit("cqo");
+                emit("idiv rcx");
+                emit("mov rax, rdx");
+                break;
+            case BinaryOp::Eq:
+                emit("cmp rax, rcx"); //ZF = 1?
+                emit("sete al"); //al = 1?
+                emit("movzx rax, al");
+                break;
+            case BinaryOp::Neq:
+                emit("cmp rax, rcx");
+                emit("setne al");
+                emit("movzx rax, al");
+                break;
+            case BinaryOp::And:
+                emit("and rax, rcx");
+                break;
+            case BinaryOp::Or:
+                emit("or rax, rcx");
+                break;
+            case BinaryOp::Lt:
+                emit("cmp rax, rcx");
+                emit("setle al");
+                emit("movzx rax, al");
+                break;
+            case BinaryOp::Le:
+                emit("cmp rax, rcx");
+                emit("setle al");
+                emit("movzx rax, al");
+                break;
+            case BinaryOp::Gt: //ZF == 0 SF == и OF
+                emit("cmp rax, rcx");
+                emit("setg al");
+                emit("movzx rax, al");
+                break;
+            case BinaryOp::Ge:
+                emit("cmp rax, rcx");
+                emit("setge al"); //127 - (-1) //10000000
+                emit("movzx rax, al");
+                break;
+        }
+    }
+}
+
+//If
+void CodeGenerator::genIf(const IfExpr& e, FuncContext& ctx){
+    std::string elseLabel = freshLabel("else");
+    std::string endLabel = freshLabel("endif");
+
+    genExpr(*e.cond, ctx); //условие rax
+    emit("cmp rax, 0");
+    emit("jz " + elseLabel);
+
+    genExpr(*e.thenBranch, ctx); //ветка then
+    emit("jmp " + endLabel);
+
+    emitLabel(elseLabel);
+    genExpr(*e.elseBranch, ctx);
+
+    emitLabel(endLabel); //после выполнения нужно ветки
+}
+
+//LetIn
+void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
+    std::vector<std::string> boundNames; //let x, y = ... (x and y)
+    
+    for(const auto& binding : e.bindings){
+        genExpr(*binding.value, ctx);
+        int off = ctx.allocLocal(binding.name);
+        emit("mov [rbp" + std::to_string(off) + "], rax"); //локальную ячейку
+        boundNames.push_back(binding.name);
+    }
+
+    genExpr(*e.body, ctx); //обрабатываем тело
+
+    //убираем связанные имена из контекста
+    for(const auto& name : boundNames){
+        ctx.removeLocal(name);
     }
 }
 
 
-void CodeGenerator::genIf(const IfExpr& e, FuncContext& ctx){
-    std::string elseLabel = freshLabel("else");
-    std::string endLabel = f
-}
 
 }

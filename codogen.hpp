@@ -31,20 +31,23 @@ struct FuncContext{
 
     //1. локальные на стеке -> глобальные функции -> встроенные
     std::optional<int> findLocal(const std::string& varName) const {
-        for(const auto& l : locals){
-            if(l.name == varName) return l.offset;
+
+         //ищем с конца веткора, первый найденный - последний добавленный - shadowing
+        for(auto it = locals.rbegin(); it != locals.rend(); it++){ 
+            if(it->name == varName) return it->offset;
         }
         return std::nullopt;
     }
 
+    //тоже для shadowing
     void removeLocal(const std::string& varName){
-        for(auto it = locals.begin(); it != locals.end(); it++){
-            if(it->name == varName){
-                locals.erase(it);
-                return;
-            }
+    for(int i = static_cast<int>(locals.size()) - 1; i >= 0; --i){
+        if(locals[i].name == varName){
+            locals.erase(locals.begin() + i);
+            return;
         }
     }
+}
 
     //должен быть выравнен по 16 байт
     int alignedStackSize() const{
@@ -59,7 +62,8 @@ class CodeGenerator{
 public:
     //для конструкторов в ADT 
     //пример в примере при match shape Circl -> tag = 0 - индекс конструктора в векторе dataTypeInfo::constructors
-    CodeGenerator(std::string filename = "<input>", const TypeRegistry& registry);
+    CodeGenerator(const TypeRegistry& registry, const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes,
+        std::string filename = "<input>");
 
     //генерация полного .asm файла
     std::string generate(const Program& prog);
@@ -76,9 +80,9 @@ private:
     int m_labelCnt = 0; //в коде
     int m_strCnt = 0; // .data
     std::unordered_map<std::string, std::string> m_funcLabels; //add и __fn_add //тут лежит тело функции
-    std::unordered_map<std::string,std::string> m_funcLabels;
 
     const TypeRegistry& m_registry;
+    const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes;
     int getConstructorTag(const std::string& ctorName) const;
 
     //utilities
@@ -133,10 +137,10 @@ private:
     //ABI
     static const char* argReg(int i); //rdi, rsi
     void emitAlloc(int size); //память в куче
-    
-    //пара временного хранения - допустим и левая и правая часть выражения хотят его использовать
-    int pushToStack(FuncContext& ctx, const std::string& label = "__tmp"); //rax во временную переменную на стеке
-    int loadFromStack(int offset, const std::string& destReg = "rax");
+
+    //вспомогательные
+    bool isFloatExpr(const ExprNode& e) const;
+    bool isStringExpr(const ExprNode& e) const;
 };
 
 }

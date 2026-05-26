@@ -253,7 +253,7 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
     auto env = std::make_shared<Environment>(); //глобальная область видимости parent = nullptr //создание таблицы символов
 
     env->define("print", Symbol{
-        "print", makeFunction(makeBuiltin("string"), makeBuiltin("unit")),
+        "print", makeFunction(makeBuiltin("unit"), makeBuiltin("unit")),
         false, {0, 0}}); //т.к встроен, а не написан пользователем
 
     env->define("input", Symbol{
@@ -582,70 +582,85 @@ void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, s
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
     const ExprNode& expr, sPtr<Environment> env, std::vector<SemanticError>& errors){
         
+    std::optional<sPtr<TypeInfo>> result;
+
     if(const auto* e = std::get_if<LiteralExpr>(&expr.var)){
-        if(std::get_if<long long>(&e->value)) return makeBuiltin("int64");
-        if(std::get_if<double>(&e->value)) return makeBuiltin("float64");
-        if(std::get_if<std::string>(&e->value)) return makeBuiltin("string");
-        if(std::get_if<bool>(&e->value)) return makeBuiltin("bool");
-        if(std::get_if<std::monostate>(&e->value)) return makeBuiltin("unit");
+        if(std::get_if<long long>(&e->value)) result = makeBuiltin("int64");
+        if(std::get_if<double>(&e->value)) result = makeBuiltin("float64");
+        if(std::get_if<std::string>(&e->value)) result = makeBuiltin("string");
+        if(std::get_if<bool>(&e->value)) result = makeBuiltin("bool");
+        if(std::get_if<std::monostate>(&e->value)) result = makeBuiltin("unit");
         return std::nullopt; //__builtin_unreachable - так как если попали в эту секцию возьмем один из вариантов
     }
 
-    if(const auto* e = std::get_if<IdentExpr>(&expr.var)){
+    else if(const auto* e = std::get_if<IdentExpr>(&expr.var)){
         auto symbol = env->lookup(e->name);
         if(!symbol){
             errors.push_back(makeError(
                 "undefined variable '" + e->name + "'", e->pos));
             return std::nullopt;
         }
-        return symbol->type; //тип идентификатора возвращаем
+
+        //встроенные функции нельзя использовать как значения
+        if(e->name == "print" || e->name == "input" || 
+            e->name == "exit"  || e->name == "panic"){
+            errors.push_back(makeError(
+                "'" + e->name + "' must be called with ()", e->pos));
+            return std::nullopt;
+        }
+
+        result = symbol->type; //тип идентификатора возвращаем
     }
 
-    if(const auto* e = std::get_if<UnaryExpr>(&expr.var)){
-        return analyzeUnary(*e, env, errors);
+    else if(const auto* e = std::get_if<UnaryExpr>(&expr.var)){
+        result = analyzeUnary(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<BinaryExpr>(&expr.var)){
-        return analyzeBinary(*e, env, errors);
+    else if(const auto* e = std::get_if<BinaryExpr>(&expr.var)){
+        result = analyzeBinary(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<CallExpr>(&expr.var)){
-        return analyzeCall(*e, env, errors);
+    else if(const auto* e = std::get_if<CallExpr>(&expr.var)){
+        result = analyzeCall(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
-        return analyzeFieldAccess(*e, env, errors);
+    else if(const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
+        result = analyzeFieldAccess(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<IfExpr>(&expr.var)){
-        return analyzeIf(*e, env, errors);
+    else if(const auto* e = std::get_if<IfExpr>(&expr.var)){
+        result =  analyzeIf(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<MatchExpr>(&expr.var)){
-        return analyzeMatch(*e, env, errors);
+    else if(const auto* e = std::get_if<MatchExpr>(&expr.var)){
+        result = analyzeMatch(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<LetInExpr>(&expr.var)){
-        return analyzeLetIn(*e, env, errors);
+    else if(const auto* e = std::get_if<LetInExpr>(&expr.var)){
+        result = analyzeLetIn(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<LambdaExpr>(&expr.var)){
-        return analyzeLambda(*e, env, errors);
+    else if(const auto* e = std::get_if<LambdaExpr>(&expr.var)){
+        result = analyzeLambda(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<TupleExpr>(&expr.var)){
-        return analyzeTuple(*e, env, errors);
+    else if(const auto* e = std::get_if<TupleExpr>(&expr.var)){
+        result = analyzeTuple(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<ListExpr>(&expr.var)){
-        return analyzeList(*e, env, errors);
+    else if(const auto* e = std::get_if<ListExpr>(&expr.var)){
+        result = analyzeList(*e, env, errors);
     }
 
-    if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
-        return analyzeConstructor(*e, env, errors);
+    else if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
+        result = analyzeConstructor(*e, env, errors);
     }
 
-    return std::nullopt;
+    else if(result && *result){
+        m_exprTypes[&expr] = *result; //сохраняем тип
+    }
+
+    return result; //может быть и nullopt
 }
 
 
@@ -777,7 +792,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
             return std::nullopt;
         }
 
-        return std::nullopt;
+        return makeBuiltin("bool");
     }
 
     //логические операторы
@@ -809,6 +824,31 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
 //Для вызываемой функции 
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    //обработка print - вынесу в отдельную функцию
+    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+        if(ident->name == "print"){
+            if(e.args.size() != 1){
+                errors.push_back(makeError("print expects 1 argument", e.pos));
+                return std::nullopt;
+            }
+
+            //вызываем анализ аргумента, чтобы запомнить тип для m_exprTypes
+            auto argType = analyzeExpr(*e.args[0], env, errors);
+            if(!argType) return std::nullopt;
+
+            if(const auto* bt = std::get_if<BuiltinType>(&(*argType)->var)){
+                if(bt->name != "int64" && bt->name != "float64" && 
+                    bt->name != "string" && bt->name != "bool"){
+                    errors.push_back(makeError(
+                        "print does not support type '" + (*argType)->toString() + "'", e.pos));
+                    return std::nullopt;
+                }
+            }
+            return makeBuiltin("unit"); //своебрзная заглушка, так как тип пока не знаем
+        }
+    }
+
 
     auto calleeType = analyzeExpr(*e.callee, env, errors); //возвратит тип add(1, 2) IdentExpr("add") - в окружении найдет add с типом
     if(!calleeType) return std::nullopt;
@@ -1091,7 +1131,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
                 (*t)->toString() + "'", e.pos));
             return std::nullopt;
         }
-    }        
+    }
+    return makeList(*firstType);
 }
 
 
