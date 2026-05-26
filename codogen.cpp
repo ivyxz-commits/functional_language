@@ -373,6 +373,8 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     m_text << "\n";
 }
 
+
+
 //expressions
 void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
 
@@ -420,7 +422,7 @@ void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
         genList(*e, ctx);
     }
 
-    else if (const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
+    else if (const auto* e = std::get_if<ConstructorExpr>(&expr.var)){ //let c = Circle(3.14) in ...
         genConstructor(*e, ctx);
     }
 
@@ -429,8 +431,102 @@ void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
     }
 }
 
+//Ident
+void CodeGenerator::genIdent(const IdentExpr& e, FuncContext& ctx){
+    auto off = ctx.findLocal(e.name); //Локальные переменные на стеке;
+    if(off){
+        emit("mov rax, [rbp" + std::to_string(*off) + "]");
+        return;
+    }
+
+    //fn add()
+    auto it = m_funcLabels.find(e.name);
+    if(it != m_funcLabels.end()){
+        emit("mov rax, " + it->second); //адрес метки
+        return;
+    }
+
+    //встроенные функции - рантайм написанный на ассемблере
+    if(e.name == "print"){
+        emit("mov rax, __lang_print_int"); //здесь будем определять, что именнно печатать //genCall изменим
+    } else if(e.name == "input"){
+        emit("mov rax, __lang_read_str");
+    } else if(e.name == "exit"){
+        emit("mov rax, __lang_exit"); 
+    } else if(e.name == "panic"){
+        emit("mov rax, __lang_panic");
+    }
+}
+
+//Literals
+void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
+    if(const auto* v = std::get_if<long long>(&e.value)){
+        emit("mov rax, " + std::to_string(*v));
+    }
+
+    //вещественное число обработаем позже
+    else if(const auto* v = std::get_if<double>(&e.value)){
+    }
+
+    //также как вещественнные позже доразбираю
+    else if(const auto* v = std::get_if<std::string>(&e.value)){
+        std::string lbl = freshStrLabel(); //уникальная метка для строки
+
+        std::string escaped;
+
+        for(char c : *v){
+            if(c == '\n') escaped += "`, 10, `";
+            else if(c == '\\') escaped += "\\\\";
+            else if(c == '"') escaped += "\\\"";
+            else escaped += c;
+        }
+    }
+
+    else if(const auto* v = std::get_if<bool>(&e.value)){
+        emit("mov rax, " + std::string(*v ? "1" : "0"));
+    }
+
+    //функции, например, которые ничего не возвращают
+    else if(std::get_if<std::monostate>(&e.value)){
+        emit("xor rax, rax"); //unit = 0
+    }
+}
+
+//Unary
+void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
+    genExpr(*e.operand, ctx);
+
+    if(e.op == UnaryOp::Neg){
+        emit("neg rax");
+    } else if(e.op == UnaryOp::Not){
+        emit("xor rax, 1"); // 0 v 1 | 1 v 1 = false
+    }
+}
+
+//чуть позже допишу
+//Binary
+void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
+    //левую часть на стек
+    genExpr(*e.left, ctx);
+    emit("push rax");
+
+    genExpr(*e.right, ctx);
+    emit("mov rcx, rax");
+    emit("pop rax"); //left
+
+    switch(e.op){
+        case BinaryOp::Add: emit("add rax, rcx"); break;
+        case BinaryOp::Sub: emit("sub rax, rcx"); break;
+        case BinaryOp::Mul: emit("imul rax, rcx"); break;
+        case BinaryOp::Div:
+
+    }
+}
 
 
-
+void CodeGenerator::genIf(const IfExpr& e, FuncContext& ctx){
+    std::string elseLabel = freshLabel("else");
+    std::string endLabel = f
+}
 
 }
