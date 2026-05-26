@@ -519,7 +519,50 @@ void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
         case BinaryOp::Sub: emit("sub rax, rcx"); break;
         case BinaryOp::Mul: emit("imul rax, rcx"); break;
         case BinaryOp::Div:
-
+            emit("cqo");
+            emit("idiv rcx"); //rax - частное
+            break;
+        case BinaryOp::Mod:
+            emit("cqo");
+            emit("idiv rcx");
+            emit("mov rax, rdx");
+            break;
+        case BinaryOp::Eq:
+            emit("cmp rax, rcx"); //ZF = 1?
+            emit("sete al"); //al = 1?
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Neq:
+            emit("cmp rax, rcx");
+            emit("setne al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::And:
+            emit("and rax, rcx");
+            break;
+        case BinaryOp::Or:
+            emit("or rax, rcx");
+            break;
+        case BinaryOp::Lt:
+            emit("cmp rax, rcx");
+            emit("setle al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Le:
+            emit("cmp rax, rcx");
+            emit("setle al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Gt: //ZF == 0 SF == и OF
+            emit("cmp rax, rcx");
+            emit("setg al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Ge:
+            emit("cmp rax, rcx");
+            emit("setge al"); //127 - (-1) //10000000
+            emit("movzx rax, al");
+            break;
     }
 }
 
