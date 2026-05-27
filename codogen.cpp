@@ -783,6 +783,204 @@ void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
     for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
 }
 
+//field access || модуль либо же именнованный конструктор
 
+void CodeGenerator::genFieldAccess(const FieldAccessExpr& e, FuncContext& ctx){
+
+    if(const auto* ident = std::get_if<IdentExpr>(&e.object->var)){
+        std::string fullName = ident->name + "." + e.field;
+
+        auto it = m_funcLabels.find(fullName); //ищем полное описанное имя среди сгенерированных функций
+        if(it != m_funcLabels.end()){
+            emit("mov rax, " + it->second); //адрес функции
+            return;
+        }
+    }
+
+    //функция недописана, допишу позже, необходимо реализовать доступ к нужному полю
+
+    //именованный конструктор
+    genExpr(*e.object, ctx);
+}
+
+//Patterns matching
+//match
+void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
+    genExpr(*e.target, ctx); //получаем желаемый тип //в кучу и указатель
+
+    int targetOff = ctx.allocLocal("__target");
+    emit("mov [rbp" + std::to_string(targetOff) + "], rax"); //target to stack
+
+    std::string endLabel = freshLabel("match_end");
+
+    for(std::size_t i = 0; i < e.arms.size(); i++){
+        const auto& arm = e.arms[i]; //берем ветку
+        std::string nextLabel = freshLabel("match_next"); //если эта не подошла
+
+        emit("mov rax, [rbp" + std::to_string(targetOff) + "]");
+        genPattern(*arm.pattern, "rax", nextLabel, ctx); 
+
+        genExpr(*arm.body, ctx); //выполняем тело ветки если результат подошел
+        emit("jmp " + endLabel);
+
+        emitLabel(nextLabel); //следующая проверка если pattern не подошел
+    }
+
+
+    /* 
+    *если паттерн подошел прыгнем в endLabel иначе скип и переходим дальше
+    */
+
+    //ни один паттерн не подошел
+    //ошибка
+
+    emitLabel(endLabel);
+    ctx.removeLocal("__target");
+}
+
+
+
+//проверка шаблона с заданный значением перед match
+void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& valueReg,
+                const std::string& failLabel, FuncContext& ctx){
+
+    if(std::get_if<WildcardPatternNode>(&pattern.var)){ //всегда подходит
+        return;
+    }
+
+    /* PatternName
+    *match 10{
+       *x -> x + 1
+    *}
+    */
+
+    //связываем переменную с текущим значением
+    if(const auto* p = std::get_if<NamePatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+        int off = ctx.allocLocal(p->name); //локальная переменная с именмем паттерна
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+        return; 
+    }
+
+    //если литерал, просто сравниваем значение
+    //нам этим еще подумаем
+    if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+
+        if(p->kind == LiteralPatternNode::Kind::Int ||
+           p->kind == LiteralPatternNode::Kind::Bool){
+
+            //проверка на float пока не осуществляется
+
+            long long value = 0;
+            if(p->value == "yep") value = 1;
+            else if(p->value == "nope") value = 0; 
+            else value = std::stoll(p->value);  //переводим строку в число
+            emit("cmp rax, " + std::to_string(value));
+            emit("jne " + failLabel);
+        }
+        return;
+    }
+
+    //Кортеж
+    if(const auto* p = std::get_if<TuplePatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+        int ptrOff = ctx.allocLocal("__tupptr");
+        emit("mov [rbp" + std::to_string(ptrOff) + "], rax"); //сохраняем указатель на кортеж
+
+        for(std::size_t i = 0; i < p->elems.size(); ++i){
+            emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+            emit("mov rax, [rax + " + std::to_string(8 + i * 8) + "]"); //rax уже указатель на первый элемент
+
+            genPattern(*p->elems[i], "rax", failLabel, ctx); //если не подходит, значит текущая ветка кортежа - skip
+        }
+        ctx.removeLocal("__tupptr");
+        return;
+    }
+
+    //ADT
+    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+
+        int tag = getConstructorTag(p->name); //достаем тег
+        emit("mov rcx, [rax]");
+        emit("cmp rcx, " + std::to_string(tag));
+        emit("jne " + failLabel); //тег не совпал - вышли
+
+        int ptrOff = ctx.allocLocal("__ctor_ptr"); //сохраняем указатель на ADT
+        emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+
+        // Рекурсивно проверяем аргументы паттерна
+        for(std::size_t i = 0; i < p->args.size(); ++i){
+            emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+            emit("mov rax, [rax + " + std::to_string(8 + i * 8) + "]");
+            genPattern(*p->args[i], "rax", failLabel, ctx);
+        }
+
+        ctx.removeLocal("__ctor_ptr");
+        return;
+    }
+
+    //cons - pattern x : xs
+    if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+
+        emit("mov rcx, [rax]");
+        emit("cmp rcx, 0");
+        emit("jz " + failLabel); //нулевой список не подойдет
+
+        emit("mov rcx, [rax + 8]"); //head
+        int headOff = ctx.allocLocal("__head");
+        emit("mov [rbp" + std::to_string(headOff) + "], rcx");
+
+        
+        emit("mov rcx, [rax + 16]"); //tail
+        int tailOff = ctx.allocLocal("__tail");
+        emit("mov [rbp" + std::to_string(tailOff) + "], rcx");
+
+        emit("mov rax, [rbp" + std::to_string(headOff) + "]");
+        genPattern(*p->head, "rax", failLabel, ctx);
+
+        emit("mov rax, [rbp" + std::to_string(tailOff) + "]");
+        genPattern(*p->tail, "rax", failLabel, ctx);
+
+        ctx.removeLocal("__head");
+        ctx.removeLocal("__tail");
+        return;
+    }
+
+    //list [] или [1, 2, 3, ...]
+    //проход в нормальном порядке в отличие от создания
+    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){
+        if(valueReg != "rax") emit("mov rax, " + valueReg);
+
+        if(p->elems.empty()){
+            emit("mov rcx, [rax]");
+            emit("cmp rcx, 0");
+            emit("jnz " + failLabel); //не кончился ли список раньше паттерна
+        } else {
+            for(const auto& elem : p->elems){
+                emit("mov rcx, [rax]");
+                emit("сmp rcx, 0");
+                emit("jz " + failLabel); //если список закончился раньше паттерна - Nil => tag = 0
+
+                emit("mov rcx, [rax + 16]"); //tail будет нужен для следующей итерации - разворчиваем cons
+                int tailOff = ctx.allocLocal("__lpt");
+                emit("mov [rbp" + std::to_string(tailOff) + "], rcx");
+
+                emit("mov rax, [rax + 8]");
+                genPattern(*elem, "rax", failLabel, ctx); //проверяем head
+
+                emit("mov rax, [rbp" + std::to_string(tailOff) + "]"); //хвост становится новым cons
+                ctx.removeLocal("__lpt");
+            }
+            
+            emit("mov rcx, [rax]");
+            emit("cmp rcx, 0");
+            emit("jnz " + failLabel); //что список нужной длины
+        }
+        return;
+    }
+}
 
 }
