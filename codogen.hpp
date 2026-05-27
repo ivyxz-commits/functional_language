@@ -141,6 +141,7 @@ private:
     //вспомогательные
     bool isFloatExpr(const ExprNode& e) const;
     bool isStringExpr(const ExprNode& e) const;
+    void emitFunctionsExterns(); 
 };
 
 }

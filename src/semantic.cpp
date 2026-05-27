@@ -825,7 +825,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
-    //обработка print - вынесу в отдельную функцию
+    //обработка print - вынесу в отдельную функцию 
+    //перехватываем тип до того, как общая логика проверяет тип
     if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
         if(ident->name == "print"){
             if(e.args.size() != 1){

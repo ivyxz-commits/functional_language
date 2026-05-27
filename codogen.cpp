@@ -36,7 +36,9 @@ std::string CodeGenerator::generate(const Program& prog){
     m_bss << "    __print_int_buf: resb 24\n"; //буфер для печати целого числа Int - 19 чисел
 
     m_text << "section .text\n";
-    m_text << "global _start\n\n"; //without libc
+    m_text << "global _start\n\n";
+    emitFunctionsExterns();
+    m_text << "\n";
 
     //объявления высшего уровня
     for(const auto& decl : prog.decls){
@@ -121,6 +123,13 @@ bool CodeGenerator::isStringExpr(const ExprNode& e) const{
     if(it == m_exprTypes.end()) return false;
     const auto *bt = std::get_if<BuiltinType>(&it->second->var);
     return bt && bt ->name == "string";
+}
+
+void CodeGenerator::emitFunctionsExterns(){
+    m_text << "extern lang_print_float\n";
+    m_text << "extern lang_parse_float\n";
+    m_text << "extern lang_parse_int\n";
+    m_text << "\n";
 }
 
 
@@ -666,6 +675,112 @@ void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
     for(const auto& name : boundNames){
         ctx.removeLocal(name);
     }
+}
+
+//Tuple {int64 count; int64 elems[count]} - куча
+void CodeGenerator::genTuple(const TupleExpr& e, FuncContext& ctx){
+    std::size_t n = e.elems.size();
+    std::size_t size = 8 + n * 8;
+
+    std::vector<int> offsets; //сдвиги временных переменных на стеке
+
+    for(const auto& elem : e.elems){
+        genExpr(*elem, ctx);
+        int offset = ctx.allocLocal("__telem");
+
+        emit("mov [rbp" + std::to_string(offset) + "], rax");
+        offsets.push_back(offset); //потом достанем со стека
+    }
+
+    emitAlloc(size); //rax указатель на кортеж
+    emit("mov qword [rax], " + std::to_string(n)); //count
+
+    int ptrOff = ctx.allocLocal("__tuple_ptr");    //указатель на кортеж
+    emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+
+    //теперь будем загружать элементы в кортеж
+    for(std::size_t i = 0; i < n; i++){
+        emit("mov rcx, [rbp" + std::to_string(offsets[i]) + "]");
+        emit("mov rax, [rbp]" + std::to_string(ptrOff) + "]");
+        emit("mov [rax + " + std::to_string(8 + i*8) + "], rcx");
+    }
+
+    emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //указатель на кортеж
+    ctx.removeLocal("__tuple_ptr");
+
+    for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
+}
+
+//со списками интереснее, список может быть двух типов пустым Nil и непустым cons(head, tail)
+//у пустого тег - 0, у непустого тег 1, чтобы в паттернс мэтчинг различать
+//любой список заканчивается Nil, Cons(2, Cons(3, Nil)) - у последнего элемента тоже должен быть хвост - дальше списка нет
+
+//cons = {tag = 1; int64 head; ptr tail} | Nil = {tag = 0}
+void CodeGenerator::genList(const ListExpr& e, FuncContext& ctx){
+    emitAlloc(8); //Nil
+    emit("mov qword [rax], 0");
+
+    int listOff = ctx.allocLocal("__list");
+    emit("mov [rbp" + std::to_string(listOff) + "], rax");
+
+    for(int i = static_cast<int>(e.elems.size()) - 1; i >= 0; i--){ 
+        genExpr(*e.elems[i], ctx);
+        int elemOff = ctx.allocLocal("__lelem");
+        emit("mov [rbp" + std::to_string(elemOff) + "], rax"); 
+
+        //Cons {tag = 1, head, tail}
+        emitAlloc(24); //ptr rax
+        emit("mov qword [rax], 1");
+
+        emit("mov rcx, [rbp" + std::to_string(elemOff) + "]"); //сохраненный элемент
+        emit("mov [rax + 8], rcx");
+
+        emit("mov rcx, [rbp" + std::to_string(listOff) + "]"); //текущий список это хвост
+        emit("mov [rax + 16], rcx");
+
+        emit("mov [rbp" + std::to_string(listOff) + "], rax"); //текущий список начинается с нового cons
+
+        ctx.removeLocal("__lelem");
+    }
+    
+    emit("mov rax, [rbp" + std::to_string(listOff) + "]"); //ptr list = rax
+
+    ctx.removeLocal("__list");
+}
+
+
+//ADT constructor { int64 tag; int64 fields[]} //tag конструктора - его индекс
+void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
+    std::size_t n = e.args.size();
+    std::size_t size = 8 + n * 8;
+
+    std::vector<int> offsets;
+
+    for(const auto& arg : e.args){
+        genExpr(*arg, ctx);
+        int offset = ctx.allocLocal("__carg");
+        emit("mov [rbp" + std::to_string(offset) + "], rax");
+        offsets.push_back(offset);
+    }
+
+    emitAlloc(size);
+
+    int tag = getConstructorTag(e.name);
+    emit("mov qword [rax], " + std::to_string(tag));
+
+    int ptrOff = ctx.allocLocal("__ctor_ptr");
+    emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+
+    for(std::size_t i = 0; i < n; ++i){
+        emit("mov rcx, [rbp" + std::to_string(offsets[i]) + "]");
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+        emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
+    }
+
+    emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //указатель на конструктор
+    ctx.removeLocal("__tuple_ptr");
+
+    for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
 }
 
 
