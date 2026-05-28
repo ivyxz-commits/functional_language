@@ -1,7 +1,12 @@
-data Shape = Circle(float64) | Rect(float64, float64)
+//5. Дано трёхзначное число. Выяснить, является ли оно палиндромом («перевёртышем»), т.е. таким числом
+// десятичная запись которого читается одинаково слева направо и справа налево.
 
-fn area(s: Shape) -> float64 =
-    match s {
-        Circle(r) -> r * r,
-        Rect(w, h) -> w * h
-    }
+fn isPalindrome(n: int64) -> bool = 
+    let a = n/100 in //env a = 1, n = 121
+    let b = (n / 10) % 10 in 
+    let c = n % 10 in 
+    a == c
+
+fn main() -> int64 =
+    let _ = print(if isPalindrome(122) then "palindrome\n" else "not palindrome\n") in
+    0

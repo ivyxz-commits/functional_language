@@ -1,4 +1,4 @@
-#include "codogen.hpp"
+#include "codegen.hpp"
 
 namespace Codegen {
 
@@ -35,6 +35,7 @@ std::string CodeGenerator::generate(const Program& prog){
     m_bss << "    __read_buf: resb 4096\n"; //read_str - input() - пустая память, не имеет значения - ОС выделяет память при запуске
     m_bss << "    __print_int_buf: resb 24\n"; //буфер для печати целого числа Int - 19 чисел
 
+    m_text << "section .note.GNU-stack noalloc noexec nowrite progbits\n";
     m_text << "section .text\n";
     m_text << "global _start\n\n";
     emitFunctionsExterns();
@@ -344,7 +345,7 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     std::swap(m_text, bodyStream); //m_text теперь пустой, а в bodyStream уже сохраняли стек и написали имя функции
     //пишем все в m_text
 
-    for(int i; i < fn.params.size() && i < 6; i++){
+    for(int i = 0; i < fn.params.size() && i < 6; i++){
         int off = ctx.allocLocal(fn.params[i].name); //nextOffset -=8
         emit("mov [rbp" + std::to_string(off) + "], " + std::string(argReg(i))); //вызывающая функция позаботиться
     }
@@ -353,7 +354,7 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
         int stackArgOffset = 16 + (i - 6) * 8;
 
         int off = ctx.allocLocal(fn.params[i].name);
-        emit("mov [rbp" + std::to_string(stackArgOffset) + "]");
+        emit("mov rax, [rbp" + std::to_string(stackArgOffset) + "]");
 
         emit("mov [rbp" + std::to_string(off) + "], rax");
     }
@@ -525,9 +526,9 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
             emit("mov rcx, 0x8000000000000000"); //маска для 1 старшого бита
             emit("movq xmm1, rcx"); //8 байт за одну операцию
             emit("xorpd xmm0, xmm1");
-        
-        
-        }    emit("neg rax");
+        } else {
+            emit("neg rax");
+        }
     } else if(e.op == UnaryOp::Not){
         emit("xor rax, 1"); // 0 v 1 | 1 v 1 = false
     }
@@ -539,13 +540,18 @@ void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
 
     //левую часть на стек
     genExpr(*e.left, ctx);
-    if(isFloat) emit("movq xmm0, rax"); //доп условие вещественных чисел
-    emit("push rax");
+
+    //сохраняем left
+    int tmpOff = ctx.allocLocal("__binlhs");
+    emit("mov [rbp" + std::to_string(tmpOff) + "], rax");
 
     genExpr(*e.right, ctx);
-    if(isFloat) emit("movq xmm1, rax");
+    if(isFloat) emit("movq xmm1, rax"); 
     emit("mov rcx, rax");
-    emit("pop rax"); //left
+
+    emit("mov rax, [rbp" + std::to_string(tmpOff) + "]");
+    ctx.removeLocal("__binlhs");
+
     if(isFloat) emit("movq xmm0, rax"); //левый в xmm0
 
     if(isFloat){
@@ -619,7 +625,7 @@ void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
                 break;
             case BinaryOp::Lt:
                 emit("cmp rax, rcx");
-                emit("setle al");
+                emit("setl al");
                 emit("movzx rax, al");
                 break;
             case BinaryOp::Le:
@@ -842,7 +848,7 @@ void CodeGenerator::genTuple(const TupleExpr& e, FuncContext& ctx){
     //теперь будем загружать элементы в кортеж
     for(std::size_t i = 0; i < n; i++){
         emit("mov rcx, [rbp" + std::to_string(offsets[i]) + "]");
-        emit("mov rax, [rbp]" + std::to_string(ptrOff) + "]");
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
         emit("mov [rax + " + std::to_string(8 + i*8) + "], rcx");
     }
 

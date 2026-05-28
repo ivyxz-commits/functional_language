@@ -71,22 +71,49 @@ preinstall:
 .PHONY : preinstall
 
 # The main recursive "clean" target.
+clean: CMakeFiles/runtime_files.dir/clean
 clean: CMakeFiles/lang.dir/clean
 .PHONY : clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/runtime_files.dir
+
+# All Build rule for target.
+CMakeFiles/runtime_files.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime_files.dir/build.make CMakeFiles/runtime_files.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime_files.dir/build.make CMakeFiles/runtime_files.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=11 "Built target runtime_files"
+.PHONY : CMakeFiles/runtime_files.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/runtime_files.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 1
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/runtime_files.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
+.PHONY : CMakeFiles/runtime_files.dir/rule
+
+# Convenience name for target.
+runtime_files: CMakeFiles/runtime_files.dir/rule
+.PHONY : runtime_files
+
+# clean rule for target.
+CMakeFiles/runtime_files.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime_files.dir/build.make CMakeFiles/runtime_files.dir/clean
+.PHONY : CMakeFiles/runtime_files.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/lang.dir
 
 # All Build rule for target.
-CMakeFiles/lang.dir/all:
+CMakeFiles/lang.dir/all: CMakeFiles/runtime_files.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8 "Built target lang"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10 "Built target lang"
 .PHONY : CMakeFiles/lang.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/lang.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 8
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 11
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/lang.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
 .PHONY : CMakeFiles/lang.dir/rule

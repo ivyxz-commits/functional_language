@@ -78,7 +78,7 @@ struct TypeInfo{
 
 //добавим удобные конструкторы для создания TypeInfo
 sPtr<TypeInfo> makeBuiltin(const std::string& name);
-sPtr<TypeInfo> makeSimle(const std::string& name);
+sPtr<TypeInfo> makeSimple(const std::string& name);
 sPtr<TypeInfo> makeList(sPtr<TypeInfo> elem);
 sPtr<TypeInfo> makeTuple(std::vector<sPtr<TypeInfo>> elems);
 sPtr<TypeInfo> makeFunction(sPtr<TypeInfo> from, sPtr<TypeInfo> to);

@@ -6,6 +6,8 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "ast.hpp"
+#include "semantic.hpp"
+#include "codegen.hpp"
 
 void printTokens(const std::vector<Lexer::Token>& tokens){
     for(const auto& tok : tokens){
@@ -337,6 +339,35 @@ int main(int argc, char* argv[]){
         printAst(prog);
         return 0;
     }
+
+
+    Semantic::Analyzer analyzer(filename);
+    auto errors = analyzer.analyze(prog);
+
+    if(!errors.empty()){
+        for(const auto& err : errors){
+            std::cerr << err.format(filename) << "\n";
+        }
+        return 1;
+    }
+
+    Codegen::CodeGenerator codegen(
+        analyzer.get_registry(),
+        analyzer.getExprTypes(), filename);
+
+    std::string asmCode = codegen.generate(prog);
+
+    std::string outFile = "output.asm";
+    std::ofstream out(outFile);
+    if(!out){
+        std::cerr << "error: cannot open output file '" << outFile << "'\n";
+        return 1;
+    }
+    
+    out << asmCode;
+    out.close();
+
+    std::cout << "generated: " << outFile << "\n";
 
     return 0;
 }

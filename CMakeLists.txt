@@ -1,31 +1,37 @@
-#если cmake - это генератор генераторов то make это конкретный сценарий по которому компилятор сейчас генерирует код
 cmake_minimum_required(VERSION 3.20)
 project(lang CXX)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON) #если компилятор не поддерживает C++23 ошибка сборки
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#собрать исполняемый файл
+# компилируем runtime_functions.c
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/runtime_functions.o
+    COMMAND gcc -c ${CMAKE_SOURCE_DIR}/src/runtime_functions.c
+            -o ${CMAKE_BINARY_DIR}/runtime_functions.o
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/runtime_functions.c)
+
+add_custom_target(runtime_files DEPENDS
+    ${CMAKE_BINARY_DIR}/runtime_functions.o)
+
 add_executable(lang
-
     src/main.cpp
-
     src/lexer/lexer.cpp
-
     src/parser/parser_base.cpp
     src/parser/parser_decls.cpp
     src/parser/parser_exprs.cpp
     src/parser/parser_patterns.cpp
     src/parser/parser_types.cpp
-)
+    src/semantic.cpp
+    src/codegen.cpp)
 
-#ищет заголовочные файлы | src только для lang
 target_include_directories(lang PRIVATE
     src
     src/lexer
-    src/parser
-)
+    src/parser)
 
-#cmake -B build - папку build создать
-#cmake --build build - собрать / скомпилировать все .cpp и слинковать в исполняемый файл
-#./build/myc file.txt --dump-tokens --dump-ast 
+add_dependencies(lang runtime_files)
+
+target_link_libraries(lang PRIVATE
+    ${CMAKE_BINARY_DIR}/runtime_functions.o
+    c)

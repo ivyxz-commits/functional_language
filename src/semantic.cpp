@@ -366,6 +366,19 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
         analyzeDecl(*decl, globalEnv, errors); //т.к unique_ptr
     }
 
+    bool hasMain = false; //наличие main
+    Pos lastPos = {1, 1};
+
+    for(const auto& decl : prog.decls){
+        if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
+            if(fn->name == "main") hasMain = true;
+        }
+    }
+
+    if(!hasMain){
+        errors.push_back(makeError("program must have a 'main' function", lastPos)); //дошли до конца файла не нашли main
+    }
+
     return errors;
 }
 
@@ -392,7 +405,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
         if(alias) return *alias; //возвращаем тип на который он указывает
 
         auto data = m_registry.lookupData(n -> name);
-        if(data) return makeSimle(n->name);
+        if(data) return makeSimple(n->name);
 
         errors.push_back(makeError("unknown type '" + n->name + "'", n->pos));
         return std::nullopt;
@@ -598,7 +611,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
         if(std::get_if<std::string>(&e->value)) result = makeBuiltin("string");
         if(std::get_if<bool>(&e->value)) result = makeBuiltin("bool");
         if(std::get_if<std::monostate>(&e->value)) result = makeBuiltin("unit");
-        return std::nullopt; //__builtin_unreachable - так как если попали в эту секцию возьмем один из вариантов
     }
 
     else if(const auto* e = std::get_if<IdentExpr>(&expr.var)){
@@ -665,7 +677,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
         result = analyzeConstructor(*e, env, errors);
     }
 
-    else if(result && *result){
+    if(result && *result){
         m_exprTypes[&expr] = *result; //сохраняем тип
     }
 

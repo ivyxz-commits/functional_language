@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/lang.dir/src/codegen.cpp.o"
+  "CMakeFiles/lang.dir/src/codegen.cpp.o.d"
   "CMakeFiles/lang.dir/src/lexer/lexer.cpp.o"
   "CMakeFiles/lang.dir/src/lexer/lexer.cpp.o.d"
   "CMakeFiles/lang.dir/src/main.cpp.o"
@@ -13,6 +15,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/lang.dir/src/parser/parser_patterns.cpp.o.d"
   "CMakeFiles/lang.dir/src/parser/parser_types.cpp.o"
   "CMakeFiles/lang.dir/src/parser/parser_types.cpp.o.d"
+  "CMakeFiles/lang.dir/src/semantic.cpp.o"
+  "CMakeFiles/lang.dir/src/semantic.cpp.o.d"
   "lang"
   "lang.pdb"
 )
