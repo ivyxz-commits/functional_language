@@ -35,8 +35,15 @@ int64_t lang_parse_float(LangStr* str){
 
 //print_float - принимает float64 как int64_t bits И печатает его как double
 void lang_print_float(int64_t bits){
+
     double value;
     memcpy(&value, &bits, 8);
 
     printf("%g\n", value);
+}
+
+//для pattern matching
+int64_t lang_str_eq(LangStr* a, LangStr* b){
+    if(a->length != b->length) return 0;
+    return memcmp(a->data, b->data, a->length) == 0 ? 1 : 0;
 }

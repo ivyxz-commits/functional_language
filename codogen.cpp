@@ -129,6 +129,7 @@ void CodeGenerator::emitFunctionsExterns(){
     m_text << "extern lang_print_float\n";
     m_text << "extern lang_parse_float\n";
     m_text << "extern lang_parse_int\n";
+    m_text << "extern lang_str_eq\n";
     m_text << "\n";
 }
 
@@ -640,6 +641,146 @@ void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
     }
 }
 
+//Call - логика функций и лямбда
+void CodeGenerator::genCall(const CallExpr& e, FuncContext& ctx){
+
+    std::vector<int> argOffsets; //аргументы на стек
+    for(const auto& arg : e.args){
+        genExpr(*arg, ctx);
+        int off = ctx.allocLocal("__arg");
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+        argOffsets.push_back(off);
+    }
+
+    //по ABI аргументы кладутся на стек в обратном порядке, чтобы первый элемент по меньшему адресу rbp
+    //a -> [984], b -> [992] | a ближе к стеку => rbp + 16 = a
+    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 6; i--){
+        emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
+    }
+
+    //первые 6 в регистры
+    for(int i = 0; i < static_cast<int>(argOffsets.size()) && i < 6; i++){
+        emit("mov " + std::string(argReg(i)) +
+             ", [rbp" + std::to_string(argOffsets[i]) + "]");
+    }
+
+    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+
+        if(ident->name == "print"){
+            if(!e.args.empty()){
+                if(isFloatExpr(*e.args[0])){
+                    emit("call lang_print_float");
+                } else if(isStringExpr(*e.args[0])){
+                    emit("call __lang_print_str");
+                } else {
+                    emit("call __lang_print_int");
+                }
+            }
+        }
+
+        else if(ident->name == "input"){
+            emit("call __lang_read_str");
+        }
+
+        //читаем и парсим int
+        else if(ident -> name == "input_int"){
+            emit("call __lang_read_str");
+            emit("mov rdi, rax");
+            emit("call lang_parse_int");
+        }
+
+        else if(ident -> name == "input_float"){
+            emit("call __lang_read_str");
+            emit("mov rdi, rax");
+            emit("call lang_parse_float");
+        }
+
+        /*
+        else if(ident->name == "parse_int"){
+            emit("call lang_parse_int");
+        }
+
+        else if(ident->name == "parse_float"){
+            emit("call lang_parse_float");
+        } */ //пока без этого
+
+        else if(ident->name == "exit"){
+            emit("call __lang_exit");
+        }
+
+        else if(ident->name == "panic"){
+            emit("call __lang_panic");
+        }
+
+        else {
+            auto it = m_funcLabels.find(ident->name); //глобальная функция пользователя
+            if(it != m_funcLabels.end()){
+                emit("call " + it->second); //название фнукции
+            } else{
+                auto off = ctx.findLocal(ident->name); //let f = \x: int64 ...  || f(5)
+                if(off){
+                    emit("mov rax, [rbp" + std::to_string(*off) + "]"); //closure ptr
+                    emit("mov r11, [rax]");
+                    emit("mov rdi, [rax + 8]");
+                    
+                    //на стек отправятся
+                    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 5; i--){
+                        emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
+                    }
+
+                    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 0 && i < 5; i--){
+                        emit("mov " + std::string(argReg(i + 1)) +
+                             ", [rbp" + std::to_string(argOffsets[i]) + "]"); //rdi указатель на env
+                    }
+                    emit("call r11");
+
+                    int stackArgs = static_cast<int>(argOffsets.size()) - 5;
+                    if(stackArgs > 0){
+                        emit("add rsp, " + std::to_string(stackArgs * 8));
+                    }
+                }
+            }
+        }
+    } else {
+        genExpr(*e.callee, ctx); //closure pointer rax
+        emit("mov r11, [rax]");
+        emit("mov rdi, [rax + 8]");
+
+        for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 5; i--){
+            emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
+        }
+
+        for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 0 && i < 5; i--){
+            emit("mov " + std::string(argReg(i + 1)) +
+                 ", [rbp" + std::to_string(argOffsets[i]) + "]");
+        }
+
+        emit("call r11"); //call __fn_double - лямбда замыкание
+       
+        int stackArgs = static_cast<int>(argOffsets.size()) - 5;
+        if(stackArgs > 0){
+            emit("add rsp, " + std::to_string(stackArgs * 8));
+        }
+        /* 
+        *fn double(x: int64) -> int64 -> int64 =
+        *\y: int64 -> x * y
+
+        *fn main() -> int64 =
+        *double(2)(10)
+        */
+    }
+
+    int stackArgs = static_cast<int>(argOffsets.size()) - 6;
+    if(stackArgs > 0){
+        emit("add rsp, " + std::to_string(stackArgs * 8));
+    }
+
+    for(int i = 0; i < static_cast<int>(argOffsets.size()); ++i){
+        ctx.removeLocal("__arg");
+    }
+}
+
+
 //If
 void CodeGenerator::genIf(const IfExpr& e, FuncContext& ctx){
     std::string elseLabel = freshLabel("else");
@@ -797,10 +938,25 @@ void CodeGenerator::genFieldAccess(const FieldAccessExpr& e, FuncContext& ctx){
         }
     }
 
-    //функция недописана, допишу позже, необходимо реализовать доступ к нужному полю
-
     //именованный конструктор
     genExpr(*e.object, ctx);
+
+    auto it = m_exprTypes.find(e.object.get());
+    const auto* st = std::get_if<SimpleType>(&it->second->var);
+    if(st){
+        auto dataInfo = m_registry.lookupData(st->name); //находим ADT
+        if(dataInfo){
+            for(const auto& ctor : dataInfo->constructors){ //поле во всех ctors
+                for(int i = 0; i < (int)ctor.fieldNames.size(); ++i){
+                    if(ctor.fieldNames[i] == e.field){
+                        emit("mov rax, [rax + " + 
+                            std::to_string(8 + i * 8) + "]"); //tag + field0 + ...
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }
 
 //Patterns matching
@@ -826,19 +982,22 @@ void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
         emitLabel(nextLabel); //следующая проверка если pattern не подошел
     }
 
-
     /* 
     *если паттерн подошел прыгнем в endLabel иначе скип и переходим дальше
     */
 
-    //ни один паттерн не подошел
-    //ошибка
+    //если ни один паттерн не подошел, семантика не проверяет - ???
+    std::string panicMsg = freshStrLabel();
+    emitDataLabel(panicMsg + "_len");
+    emitData("dq 22");
+    emitDataLabel(panicMsg + "_dat");
+    emitData("db `match: no matching arm`, 0");
+    emit("mov rdi, " + panicMsg + "_len");
+    emit("call __lang_panic");
 
     emitLabel(endLabel);
     ctx.removeLocal("__target");
 }
-
-
 
 //проверка шаблона с заданный значением перед match
 void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& valueReg,
@@ -863,7 +1022,6 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
     }
 
     //если литерал, просто сравниваем значение
-    //нам этим еще подумаем
     if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){
         if(valueReg != "rax") emit("mov rax, " + valueReg);
 
@@ -875,9 +1033,40 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
             long long value = 0;
             if(p->value == "yep") value = 1;
             else if(p->value == "nope") value = 0; 
-            else value = std::stoll(p->value);  //переводим строку в число
+            else value = std::stoll(p->value); //переводим лексему в число
             emit("cmp rax, " + std::to_string(value));
             emit("jne " + failLabel);
+        }
+
+        else if(p->kind == LiteralPatternNode::Kind::Real){
+            double value = std::stod(p->value);
+            uint64_t bits = std::bit_cast<uint64_t>(value);
+            emit("movabs rcx, " + std::to_string(bits));
+            emit("cmp rax, rcx");
+            emit("jne " + failLabel);
+        }
+
+        else if(p->kind == LiteralPatternNode::Kind::String){
+            std::string label = freshStrLabel();
+            std::string escaped;
+
+            for(char c : p->value){ //db `hello`, 10, `world`, 0 - "hello\nworld"
+                if(c == '\n') escaped += "`, 10, `";
+                else if(c == '\\') escaped += "\\\\";
+                else if(c == '"') escaped += "\\\"";
+                else escaped += c;
+            }
+
+            emitDataLabel(label + "_len");
+            emitData("dq " + std::to_string(p->value.size()));
+            emitDataLabel(label + "_dat"); //после длины следующие 8 байт
+            emitData("db `" + escaped + "`, 0"); //до байта 0 
+            
+            emit("mov rdi, rax"); //rdi - target, rsi - pattern_str
+            emit("mov rsi, " + label);
+            emit("call lang_str_eq");
+            emit("cmp rax, 0");
+            emit("jz " + failLabel);
         }
         return;
     }
@@ -984,6 +1173,7 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
 }
 
 
+
 // \y -> x + y ==> x - free, берем, например, из let
 std::vector<std::string> CodeGenerator::findFreeVars(
     const LambdaExpr& e, const FuncContext& ctx) const{
@@ -1081,7 +1271,6 @@ void CodeGenerator::scanExpr(const ExprNode& expr, const std::vector<std::string
         return;
     }
 }
-
 
 //проблема такая же как в genFuncDecl - нужен временный буфер чтобы узнать stacksize
 //асемблерный код для тела лямбды | rdi - указатель на захваченные переменные - rsi, rdi, rcx, ... явные параметры

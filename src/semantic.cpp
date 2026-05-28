@@ -267,6 +267,14 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
     env->define("panic", Symbol{
         "panic", makeFunction(makeBuiltin("string"), makeBuiltin("unit")),
         false, {0, 0}});
+        
+    env->define("input_int", Symbol{
+        "input_int", makeFunction(makeBuiltin("unit"), makeBuiltin("int64")),
+        false, {0,0}});
+
+    env->define("input_float", Symbol{
+        "input_float", makeFunction(makeBuiltin("unit"), makeBuiltin("float64")),
+        false, {0,0}});
 
     return env;
 }
@@ -603,7 +611,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
 
         //встроенные функции нельзя использовать как значения
         if(e->name == "print" || e->name == "input" || 
-            e->name == "exit"  || e->name == "panic"){
+            e->name == "exit"  || e->name == "panic" || 
+            e->name == "input_int" || e->name == "input_float"){
             errors.push_back(makeError(
                 "'" + e->name + "' must be called with ()", e->pos));
             return std::nullopt;
@@ -847,6 +856,22 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
                 }
             }
             return makeBuiltin("unit"); //своебрзная заглушка, так как тип пока не знаем
+        } 
+
+        if(ident->name == "input_int"){
+            if(!e.args.empty()){
+                errors.push_back(makeError("input_int expects no arguments", e.pos));
+                return std::nullopt;
+            }
+            return makeBuiltin("int64");
+        }
+
+        if(ident->name == "input_float"){
+            if(!e.args.empty()){
+                errors.push_back(makeError("input_float expects no arguments", e.pos));
+                return std::nullopt;
+            }
+            return makeBuiltin("float64");
         }
     }
 
