@@ -983,4 +983,207 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
     }
 }
 
+
+// \y -> x + y ==> x - free, берем, например, из let
+std::vector<std::string> CodeGenerator::findFreeVars(
+    const LambdaExpr& e, const FuncContext& ctx) const{
+
+    std::vector<std::string> result;
+    std::vector<std::string> bound;
+    for(const auto& p : e.params) bound.push_back(p.name);
+
+    scanExpr(*e.body, bound, ctx, result);
+    return result;
+}
+
+//захватываем то, что живет на стеке вызывающей функции
+void CodeGenerator::scanExpr(const ExprNode& expr, const std::vector<std::string>& bound,
+    const FuncContext& ctx, std::vector<std::string>& result) const{
+
+    if(const auto* id = std::get_if<IdentExpr>(&expr.var)){
+        bool isBound = false;
+        for(const auto& b : bound) if(b == id -> name) isBound = true; //есть ли имя среди связанных?
+        if(!isBound && ctx.findLocal(id->name)){ //есть во внешнем ctx
+            bool found = false;
+            for(const auto& r : result) if(r == id -> name) found = true;
+            if(!found) result.push_back(id->name);
+        }
+        return;
+    }
+
+    if(const auto* bin = std::get_if<BinaryExpr>(&expr.var)){
+        scanExpr(*bin -> left, bound, ctx, result);
+        scanExpr(*bin -> right, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* unexp = std::get_if<UnaryExpr>(&expr.var)){
+        scanExpr(*unexp -> operand, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* call = std::get_if<CallExpr>(&expr.var)){
+        scanExpr(*call -> callee, bound, ctx, result);
+        for(const auto& a : call->args) scanExpr(*a, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* _if = std::get_if<IfExpr>(&expr.var)){
+        scanExpr(*_if -> cond, bound, ctx, result);
+        scanExpr(*_if -> thenBranch, bound, ctx, result);
+        scanExpr(*_if -> elseBranch, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* let = std::get_if<LetInExpr>(&expr.var)){
+        for(const auto& b : let-> bindings) scanExpr(*b.value, bound, ctx, result); //значение let переменных, а потом тела
+        scanExpr(*let -> body, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* ctor = std::get_if<ConstructorExpr>(&expr.var)){
+        for(const auto& a : ctor -> args) scanExpr(*a, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* tuple = std::get_if<TupleExpr>(&expr.var)){
+        for(const auto& e : tuple -> elems) scanExpr(*e, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* list = std::get_if<ListExpr>(&expr.var)){
+        for(const auto& e : list->elems) scanExpr(*e, bound, ctx, result);
+        return;
+    }
+    
+    if(const auto* match = std::get_if<MatchExpr>(&expr.var)){
+        scanExpr(*match -> target, bound, ctx, result);
+        for(const auto& arm : match -> arms) scanExpr(*arm.body, bound, ctx, result);
+        return;
+    }
+
+    if(const auto* lambda = std::get_if<LambdaExpr>(&expr.var)){
+        // вложенная лямбда — добавляем её параметры в bound
+        std::vector<std::string> newBound = bound;
+        for(const auto& p : lambda -> params) newBound.push_back(p.name);
+        scanExpr(*lambda->body, newBound, ctx, result);
+        return;
+    }
+
+    /* внутренняя лямбда может хранить переменные из внешнего let к примеру
+    *let base = 10 in
+    *let step = 2 in
+    *let f = \x: int64 -> (\y: int64 -> x + y + base + step)
+    */
+
+    if(const auto* fieldaccess = std::get_if<FieldAccessExpr>(&expr.var)){
+        scanExpr(*fieldaccess->object, bound, ctx, result);
+        return;
+    }
+}
+
+
+//проблема такая же как в genFuncDecl - нужен временный буфер чтобы узнать stacksize
+//асемблерный код для тела лямбды | rdi - указатель на захваченные переменные - rsi, rdi, rcx, ... явные параметры
+std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
+    const std::vector<std::string>& captured, FuncContext& outer){ //с внешним контекстом
+
+    std::string funcLabel = freshLabel("lambda");
+
+    std::ostringstream bodyStream; //сохранили основной поток, генерируем все во временный
+    std::swap(m_text, bodyStream); //временный сейчас для нас m_text
+
+    emitLabel(funcLabel);
+    emit("push rbp");
+    emit("mov rbp, rsp");
+
+    FuncContext ctx;
+    ctx.name = funcLabel; //имя текущий функции в контекст
+
+    int envOff = ctx.allocLocal("__env");
+    emit("mov [rbp" + std::to_string(envOff) + "], rdi"); //ptr на внешнее окружение
+
+    for(std::size_t i = 0; i < captured.size(); ++i){
+        int offset = ctx.allocLocal(captured[i]);
+        emit("mov rax, [rbp" + std::to_string(envOff) + "]");
+        emit("mov rax, [rax + " + std::to_string(i * 8) + "]");
+
+        //сохраняем внешнюю переменную как обычную переменную лямбды
+        emit("mov [rbp" + std::to_string(offset) + "], rax");
+    }
+
+    static const char* lambdaArgRegs[] = {"rsi","rdx","rcx","r8","r9"};
+    for(std::size_t i = 0; i < e.params.size() && i < 5; ++i){
+        int offset = ctx.allocLocal(e.params[i].name);
+        emit("mov [rbp" + std::to_string(offset) + "], " + std::string(lambdaArgRegs[i]));
+    }
+
+    //аналогично genFuncDecl - достаем аргументы 6+ из стека || [rbp + 16], [rbp + 24], ...
+    for(std::size_t i = 5; i < e.params.size(); ++i){
+        int stackArgOffset = 16 + (i - 5) * 8;
+        int offset = ctx.allocLocal(e.params[i].name);
+        emit("mov rax, [rbp + " + std::to_string(stackArgOffset) + "]"); //кладем из общего стека (стека вызывающей функции)
+        emit("mov [rbp" + std::to_string(offset) + "], rax"); //в стек нашей функции
+    }
+
+    genExpr(*e.body, ctx);
+
+    // эпилог
+    std::string body = m_text.str(); //чтобы узнать точный размер стека
+    std::swap(m_text, bodyStream);
+
+    int stackSize = ctx.alignedStackSize();
+    if(stackSize > 0){
+        emit("sub rsp, " + std::to_string(stackSize));
+    }
+
+    m_text << body;
+    emit("mov rsp, rbp");
+    emit("pop rbp");
+    emit("ret");
+    m_text << "\n";
+
+    return funcLabel;
+}
+
+//для замыкания нужен сам код и env - в куче объект замыкания {code ptr, env_ptr}
+//основная функция лямбды - работает по аналогу с обычной функцией, но "улучшенная" версия
+void CodeGenerator::genLambda(const LambdaExpr& e, FuncContext& ctx){
+
+    auto captured = findFreeVars(e, ctx);
+
+    std::string funcLabel = genLambdaFunc(e, captured, ctx);
+
+    //окружение для захваченных переменных
+    std::size_t envSize = captured.empty() ? 0 : captured.size() * 8;
+
+    if(envSize > 0){
+        emitAlloc(envSize);
+    } else {
+        emit("xor rax, rax"); //env = NULL
+    }
+
+    int envOff = ctx.allocLocal("__lambda_env"); //сохранить env_ptr //по имени чтобы потом удалить
+    emit("mov [rbp" + std::to_string(envOff) + "], rax");
+
+    for(std::size_t i = 0; i < captured.size(); ++i){ //captured в env
+        auto varOff = ctx.findLocal(captured[i]); //переменная во внешнем контексте
+        if(varOff){
+            emit("mov rcx, [rbp" + std::to_string(*varOff) + "]");
+            emit("mov rax, [rbp" + std::to_string(envOff) + "]");
+            emit("mov [rax + " + std::to_string(i * 8) + "], rcx"); //записываем captured переменную в env
+        }
+    }
+
+    emitAlloc(16); //rax = closure ptr
+    emit("mov rcx, " + funcLabel);
+    emit("mov [rax], rcx"); //code ptr
+    emit("mov rcx, [rbp" + std::to_string(envOff) + "]");
+    emit("mov [rax + 8], rcx"); //env ptr
+
+    ctx.removeLocal("__lambda_env");
+}
+
+
+
 }

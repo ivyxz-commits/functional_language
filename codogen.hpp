@@ -133,6 +133,8 @@ private:
     //замыкания
     std::string genLambdaFunc(const LambdaExpr& e, const std::vector<std::string>& captured, FuncContext& outer);
     std::vector<std::string> findFreeVars(const LambdaExpr& e, const FuncContext& ctx) const; // \y -> x + y ==> x - free, берем, например, из let
+    //вспомогательная к findFreeVars
+    void scanExpr(const ExprNode& expr, const std::vector<std::string>& bound, const FuncContext& ctx, std::vector<std::string>& result) const;
 
     //ABI
     static const char* argReg(int i); //rdi, rsi
