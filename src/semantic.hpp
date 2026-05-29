@@ -177,13 +177,25 @@ private:
     //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
 
+
     //разбор объявлений
+
+    using TypeVarMap = const std::unordered_map<std::string, sPtr<TypeInfo>>&; //псевдоним для упрощения визуального
+
     void analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    //анализация функции и ее тела
     void analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void checkFuncBody(const FuncDecl& fn, sPtr<Environment> funcEnv, std::vector<SemanticError>& errors);
+
     void analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>& errors);
+
     //дата типам не нужно окружение, сразу в реестр типов
     void analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors);
-    void analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<SemanticError>&errors);
+    ConstructorInfo buildConstructorInfo(const ConstructorDecl& ctor, const std::string& dataName,
+    const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
 
     //разбор образцов(шаблонов) //образец хороший если он структурно совместим с типом сопоставляемого значения
     //ConsPattern x : xs — хороший если expectedType это список, а иначе зачем нам внутрь заходить и проверять match и получать доп. ошибки
@@ -203,24 +215,96 @@ private:
     //разбор типов (TypeNode -> TypeInfo)
     std::optional<sPtr<TypeInfo>> resolveType(
         const TypeNode& node,
-        //таблица подстановки параметров типа (разбираем типы внутри ADT)
+        //таблица подстановки параметров типа (разбираем типы внутри ADT) - на будущее
         const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
+        std::vector<SemanticError>& errors);
+
+    //вспомогательные функции для каждого типа
+    std::optional<sPtr<TypeInfo>> resolveBuiltinType(const BuiltinTypeNode& n);
+
+    std::optional<sPtr<TypeInfo>> resolveSimpleType(const SimpleTypeNode& n, 
+        TypeVarMap typeVarMap, 
+        std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> resolveGenericType(const GenericTypeNode& n, 
+        TypeVarMap typeVarMap, 
+        std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> resolveListType(const ListTypeNode& n, 
+        TypeVarMap typeVarMap, 
+        std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> resolveTupleType(const TupleTypeNode& n, 
+        TypeVarMap typeVarMap, 
+        std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> resolveFunctionType(const FunctionTypeNode& n, 
+        TypeVarMap typeVarMap, 
         std::vector<SemanticError>& errors);
 
 
     //разбор выражений (тип выажения или nullopt)
     std::optional<sPtr<TypeInfo>> analyzeExpr(const ExprNode&, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeLetIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeIdent(const IdentExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeIf(const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeMatch(const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeLambda(const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeBinary(const BinaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeUnary(const UnaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeFieldAccess(const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeCall(const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeTuple(const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    ////////////////////////////////////////
+    //Binary
+    std::optional<sPtr<TypeInfo>> analyzeBinary(const BinaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    std::optional<sPtr<TypeInfo>> checkArithmetic(const BinaryExpr& e, const sPtr<TypeInfo>& left, 
+        const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> checkComparison(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+        const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> checkEquality(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+        const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> checkLogical(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+        const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors);
+
+    ////////////////////////////////////////
+    //Call
+    std::optional<sPtr<TypeInfo>> analyzeCall(const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    std::optional<sPtr<TypeInfo>> analyzeCallPrint(const CallExpr& e, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> analyzeCallInput(const std::string& name, const CallExpr& e,
+        const std::string& retType, std::vector<SemanticError>& errors);
+        
+    std::optional<sPtr<TypeInfo>> analyzeCallBuiltin(const IdentExpr& ident, const CallExpr& e, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    ///////////////////////////////////////
+    //LetIn
+    std::optional<sPtr<TypeInfo>> analyzeLetIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    bool checkLetAnnotation(const LetBinding& binding, const sPtr<TypeInfo>& valueType, 
+        std::vector<SemanticError>& errors);
+
+    bool defineLetBinding(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+        sPtr<Environment> letEnv, std::vector<SemanticError>& errors);    
+
+
+    ///////////////////////////////////////
+    //Match
+    std::optional<sPtr<TypeInfo>> analyzeMatch(const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    void checkMatchArm(const MatchArm& arm, std::optional<sPtr<TypeInfo>>& resultType, 
+        const sPtr<TypeInfo>& bodyType, std::vector<SemanticError>& errors);
+
+
 
     //вспомогательные функции
     //функции проверки типов
@@ -235,6 +319,12 @@ private:
     
     //регистрация всех объявлений верхнего уровня
     void firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    //вспомогательные функции
+    void firstPassAlias(const TypeAliasDecl& alias, std::vector<SemanticError>& errors);
+    void firstPassData(const DataDecl& data, std::vector<SemanticError>& errors);
+    void firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    void firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     /* //если идти по порядку при анализации smth, bar еще не будет зарегестрирован и получим ошибку
     /поэтому сначала регистрируем все обозначения и типы до проверки тел

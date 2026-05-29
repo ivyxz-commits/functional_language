@@ -3,7 +3,6 @@
 namespace Semantic{ 
 
 //реализация вспомогательных конструкторов для TypeInfo
-
 sPtr<TypeInfo> makeBuiltin(const std::string& name){
     return std::make_shared<TypeInfo>(TypeInfo{BuiltinType{name}});
 }
@@ -20,16 +19,16 @@ sPtr<TypeInfo> makeTuple(std::vector<sPtr<TypeInfo>> elems){
     return std::make_shared<TypeInfo>(TypeInfo{TupleType{std::move(elems)}});
 }
 
-sPtr<TypeInfo> makeFunction(sPtr<TypeInfo> from, sPtr<TypeInfo> to){
-    return std::make_shared<TypeInfo>(TypeInfo{FunctionType{std::move(from), std::move(to)}});
-}
-
 sPtr<TypeInfo> makeGeneric(const std::string& name, std::vector<sPtr<TypeInfo>> args){
     return std::make_shared<TypeInfo>(TypeInfo{GenericType{name, std::move(args)}});
 }   
 
-//совместимость типов
+sPtr<TypeInfo> makeFunction(sPtr<TypeInfo> from, sPtr<TypeInfo> to){
+    return std::make_shared<TypeInfo>(TypeInfo{FunctionType{std::move(from), std::move(to)}});
+}
+//без functionType не могли бы отличить функцию от обычного значения
 
+//совместимость типов
 bool TypeInfo::equals(const TypeInfo& other) const { 
     if(var.index() != other.var.index()) return false;
 
@@ -82,45 +81,8 @@ bool TypeInfo::equals(const TypeInfo& other) const {
     return toString() == other.toString();
 } */
 
-//для красивого вывода ошибок //вывод типа из TypeInfo
-std::string TypeInfo::toString() const{
-    if(auto* t = std::get_if<BuiltinType>(&var)){ //&this -> var - указатель на текущий объект
-        return t->name;
-    }
 
-    if(auto *t = std::get_if<SimpleType>(&var)){ 
-        return t->name;
-    }
-
-    if(auto *t = std::get_if<GenericType>(&var)){ 
-        std::string s = t->name + "[";
-        for(int i = 0; i < t->args.size(); i++){ 
-            if(i) s += ", ";
-            s += t->args[i]->toString();
-        }
-        return s + "]";
-    }
-
-    if(auto* t = std::get_if<TupleType>(&var)){ 
-        std::string s = "(";
-        for(int i = 0; i < t->elems.size(); i++){ 
-            if(i) s += ", ";
-            s += t->elems[i]->toString();
-        }
-        return s + ")";
-    }
-
-    if(auto* t = std::get_if<ListType>(&var)){ 
-        return "[" + t->elem->toString() + "]";
-    }
-
-    if(auto *t = std::get_if<FunctionType>(&var)){ 
-        return t->from->toString() + " -> " + t->to->toString();
-    }
-
-    return "<unknown>";
-}
-
+//красивый вывод ошибок
 std::string Analyzer::binaryOpToString(Parser::BinaryOp op){
     switch(op){
         case BinaryOp::Add: return "+";
@@ -139,6 +101,52 @@ std::string Analyzer::binaryOpToString(Parser::BinaryOp op){
     }
     __builtin_unreachable();
 }
+
+//вывод типа из TypeInfo
+std::string TypeInfo::toString() const{
+    if(auto* t = std::get_if<BuiltinType>(&var)) return builtinToString(*t); //&this -> var - указатель на текущий объект
+    if(auto *t = std::get_if<SimpleType>(&var)) return simpleToString(*t);
+    if(auto *t = std::get_if<GenericType>(&var)) return genericToString(*t);
+    if(auto* t = std::get_if<TupleType>(&var)) return tupleToString(*t);
+    if(auto* t = std::get_if<ListType>(&var)) return listToString(*t);
+    if(auto *t = std::get_if<FunctionType>(&var)) return functionToString(*t);
+    return "<unknown>";
+}
+
+static std::string builtinToString(const BuiltinType& t){
+    return t.name;
+}
+
+static std::string simpleToString(const SimpleType& t){
+    return t.name;
+}
+
+static std::string genericToString(const GenericType& t){
+    std::string s = t.name + "[";
+    for(int i = 0; i < t.args.size(); i++){ 
+        if(i) s += ", ";
+        s += t.args[i]->toString();
+    }
+    return s + "]";
+}
+
+static std::string tupleToString(const TupleType& t){
+    std::string s = "(";
+    for(int i = 0; i < t.elems.size(); i++){ 
+        if(i) s += ", ";
+        s += t.elems[i]->toString();
+    }
+    return s + ")";
+}
+
+static std::string listToString(const ListType& t){
+    return "[" + t.elem->toString() + "]";
+}
+
+static std::string functionToString(const FunctionType& t){
+    return t.from->toString() + " -> " + t.to->toString();
+}
+
 
 
 //окружение
@@ -185,6 +193,7 @@ bool TypeRegistry::registerAlias(const std::string& name, sPtr<TypeInfo> type){
     m_aliases[name] = std::move(type);
     return true;
 }
+
 
 //Найти ADT по имени
 std::optional<DataTypeInfo> TypeRegistry::lookupData(const std::string& name) const{
@@ -282,72 +291,72 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
 //реализация firstPass()
 void Analyzer::firstPass(const std::vector<Ptr<DeclNode>>& decls, sPtr<Environment> env, std::vector<SemanticError>& errors){ 
     for(const auto& decl : decls){
-
-        //typeAliasDecl
-        if(const auto* alias = std::get_if<TypeAliasDecl>(&decl->var)){ //по адресу
-            analyzeAliasDecl(*alias, errors);
-        }
-
-        else if(const auto* data = std::get_if<DataDecl>(&decl->var)){
-            analyzeDataDecl(*data, errors);
-        }
-
-        else if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){ 
-            sPtr<TypeInfo> retType;
-
-            if(fn->returnType){
-                auto rt = resolveType(**fn -> returnType, {}, errors); //optional and ptr
-                retType = rt ? *rt : makeBuiltin("unit"); //невалидный тип
-            } else {
-                errors.push_back(makeError(
-                        "function '" + fn->name + "' missing return type annotation", fn->pos));
-                continue;                
-            }
-
-            sPtr<TypeInfo> funcType;
-            if(fn->params.empty()){
-                funcType = makeFunction(makeBuiltin("unit"), retType);
-            } else {
-                funcType = retType; //правоассоциативность
-                bool hasError = false;
-
-                for(int i = static_cast<int>(fn->params.size()) - 1; i >= 0; i--){
-                    auto paramType = resolveType(*fn->params[i].type, {}, errors);
-
-                    if(!paramType){
-                        hasError = true;
-                        continue;
-                    }
-
-                    if(!hasError) funcType = makeFunction(*paramType, funcType);
-                }
-
-                if(hasError) funcType = makeBuiltin("unit"); //заглушка
-            }
-
-            if(!env ->define(fn->name, Symbol{fn->name, funcType, false, fn->pos})){
-                errors.push_back(makeError(
-                    "function '" + fn->name + "'is already declared", fn->pos));
-            }
-        } 
-
-        //объявление модуля
-        else if(const auto* mod = std::get_if<ModuleDecl>(&decl->var)){
-            auto modEnv = std::make_shared<Environment>(env);
-
-            firstPass(mod -> decls, modEnv, errors);
-
-            //положи в словарь по ключу mod -> name значение modEnv
-            m_moduleEnvs[mod -> name] = modEnv; //это для будущего обращения к модулю через analyzeFieldAccess
-            
-
-            if(!env -> define(mod -> name, Symbol{mod -> name, makeBuiltin("unit"), false, mod -> pos})){
-                errors.push_back(makeError(
-                    "module '" + mod -> name + "' is already declared", mod->pos));
-            }
-        }
+        if(const auto* alias = std::get_if<TypeAliasDecl>(&decl->var)) firstPassAlias(*alias, errors);
+        else if(const auto* data = std::get_if<DataDecl>(&decl->var)) firstPassData(*data, errors);
+        else if(const auto* func = std::get_if<FuncDecl>(&decl->var)) firstPassFunc(*func, env, errors);
+        else if(const auto* mod = std::get_if<ModuleDecl>(&decl->var)) firstPassModule(*mod, env, errors);
     }
 }
+
+void Analyzer::firstPassAlias(const TypeAliasDecl& alias, std::vector<SemanticError>& errors){
+    analyzeAliasDecl(alias, errors);
+}
+
+void Analyzer::firstPassData(const DataDecl& data, std::vector<SemanticError>& errors){
+    analyzeDataDecl(data, errors);
+}
+
+//правоассоцитвное построение + левый обход - возможный доп для частичного применения
+void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    if(!fn.returnType){
+        errors.push_back(makeError(
+            "function '" + fn.name + "' missing return type annotation", fn.pos)); //не указали тип
+    }
+
+    auto rt = resolveType(**fn.returnType, {}, errors);
+    sPtr<TypeInfo> retType = rt ? *rt : makeBuiltin("unit"); //чтобы продолжили обрабатывать функцию
+
+    sPtr<TypeInfo> funcType;
+    if(fn.params.empty()){
+        funcType = makeFunction(makeBuiltin("unit"), retType);
+    } else {
+        funcType = retType;
+        bool hasError = false;
+
+        for(int i = static_cast<int>(fn.params.size()) - 1; i >= 0; i--){
+            auto paramType = resolveType(*fn.params[i].type, {}, errors);
+            
+            if(!paramType){ //если не разрешили тип
+                hasError = true; 
+                continue; 
+            }
+
+            if(!hasError) funcType = makeFunction(*paramType, funcType);
+        }
+
+        if(hasError) funcType = makeBuiltin("unit");
+    }
+
+    if(!env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos})){
+        errors.push_back(makeError(
+            "function '" + fn.name + "' is already declared", fn.pos));
+    }
+
+}
+
+void Analyzer::firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    auto modEnv = std::make_shared<Environment>(env);
+    firstPass(mod.decls, modEnv, errors);
+            
+    //положи в словарь по ключу mod -> name значение modEnv
+    m_moduleEnvs[mod.name] = modEnv; //это для будущего обращения к модулю через analyzeFieldAccess
+
+    if(!env -> define(mod.name, Symbol{mod.name, makeBuiltin("unit"), false, mod.pos})){
+        errors.push_back(makeError(
+            "module '" + mod.name + "' is already declared", mod.pos));
+    }
+}
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 Analyzer::Analyzer(std::string filename) : m_filename(std::move(filename)) {}
@@ -366,71 +375,107 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
         analyzeDecl(*decl, globalEnv, errors); //т.к unique_ptr
     }
 
-    bool hasMain = false; //наличие main
-    Pos lastPos = {1, 1};
-
-    for(const auto& decl : prog.decls){
-        if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
-            if(fn->name == "main") hasMain = true;
-        }
-    }
-
-    if(!hasMain){
-        errors.push_back(makeError("program must have a 'main' function", lastPos)); //дошли до конца файла не нашли main
+    if(!hasMainFunction(prog.decls)){
+        errors.push_back(makeError("program must have a 'main' function", lastDeclPos(prog.decls))); //дошли до конца файла не нашли main
     }
 
     return errors;
 }
 
+static bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
+    
+    for(const auto& decl : decls){
+        if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
+            if(fn->name == "main") return true;
+        }
+    }
+
+    return false;
+}
+
+static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
+    if(decls.empty()) return {1, 1};
+    
+    const auto& last = decls.back()->var;
+    
+    if(const auto* func = std::get_if<FuncDecl>(&last)) return func->pos;
+    if(const auto* mod = std::get_if<ModuleDecl>(&last)) return mod->pos;
+    if(const auto* data = std::get_if<DataDecl>(&last)) return data->pos;
+    if(const auto* alias = std::get_if<TypeAliasDecl>(&last)) return alias->pos;
+    
+    __builtin_unreachable();
+}
+
+
+
+//псевдонимом укоротим
+using TypeVarMap = const std::unordered_map<std::string, sPtr<TypeInfo>>&;
 
 //преобразуем тип TypeNode из AST в TypeInfo
 //typeVarMap - Таблица подстановки параметров (a -> int64)
-//удобнее сравнивать, два одинаковых узла типа, могут быть разными узлами AST (equals)
-//TypeNode name - просто строка, в TypeInfo after resolveAlias it is BuiltinType("string") -сразу можно сравнить
+//удобнее сравнивать, два одинаковых узла типа, могут быть разными узлами AST
+//TypeNode name - просто строка, в TypeInfo after resolveAlias it is BuiltinType("string") - сразу можно сравнить
 std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node, 
         const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
         std::vector<SemanticError>& errors){    
 
     //BuiltinTypeNode -> BuiltinType
-    if(auto* n = std::get_if<BuiltinTypeNode>(&node.var)){
-        return makeBuiltin(n -> name); 
-    }
-
+    if(auto* n = std::get_if<BuiltinTypeNode>(&node.var)) return resolveBuiltinType(*n);
     //параметры типа, псведоним или ADT
-    if(auto* n = std::get_if<SimpleTypeNode>(&node.var)){
-        auto it = typeVarMap.find(n -> name);
+    if(auto* n = std::get_if<SimpleTypeNode>(&node.var)) return resolveSimpleType(*n, typeVarMap, errors);
+    if(auto* n = std::get_if<GenericTypeNode>(&node.var)) return resolveGenericType(*n, typeVarMap, errors);
+    if(auto* n = std::get_if<ListTypeNode>(&node.var)) return resolveListType(*n, typeVarMap, errors);
+    if(auto* n = std::get_if<TupleTypeNode>(&node.var)) return resolveTupleType(*n, typeVarMap, errors);
+    if(auto* n = std::get_if<FunctionTypeNode>(&node.var)) return resolveFunctionType(*n, typeVarMap, errors);
+
+    __builtin_unreachable();
+}
+
+//вспомогательные функции перевода
+std::optional<sPtr<TypeInfo>> Analyzer::resolveBuiltinType(const BuiltinTypeNode& n){
+    return makeBuiltin(n.name); 
+}
+
+std::optional<sPtr<TypeInfo>> Analyzer::resolveSimpleType(const SimpleTypeNode& n, 
+    TypeVarMap typeVarMap, 
+    std::vector<SemanticError>& errors){
+        
+        auto it = typeVarMap.find(n.name);
         if(it != typeVarMap.end()) return it -> second;
 
-        auto alias = m_registry.lookupAlias(n -> name);
+        auto alias = m_registry.lookupAlias(n.name);
         if(alias) return *alias; //возвращаем тип на который он указывает
 
-        auto data = m_registry.lookupData(n -> name);
-        if(data) return makeSimple(n->name);
+        auto data = m_registry.lookupData(n.name);
+        if(data) return makeSimple(n.name);
 
-        errors.push_back(makeError("unknown type '" + n->name + "'", n->pos));
+        errors.push_back(makeError("unknown type '" + n.name + "'", n.pos));
         return std::nullopt;
     }
 
-    if(auto* n = std::get_if<GenericTypeNode>(&node.var)){ 
-        auto data = m_registry.lookupData(n->name);
+std::optional<sPtr<TypeInfo>> Analyzer::resolveGenericType(const GenericTypeNode& n, 
+    TypeVarMap typeVarMap, 
+    std::vector<SemanticError>& errors){
+
+        auto data = m_registry.lookupData(n.name);
 
         //ищем data тип в реестре
         if(!data){
-            errors.push_back(makeError("unknown generic type'" + n->name + "'", n->pos));
+            errors.push_back(makeError("unknown generic type'" + n.name + "'", n.pos));
             return std::nullopt;
         }
 
         //data Option[a] = Ok(a) | Err(e) - ошибка
-        if(n->args.size() != data->typeParams.size()){
+        if(n.args.size() != data->typeParams.size()){
             errors.push_back(makeError(
-                "type '" + n->name + "' expects" + std::to_string(data->typeParams.size()) + 
-                " type parameter(s), got " + std::to_string(n->args.size()), n->pos));
+                "type '" + n.name + "' expects" + std::to_string(data->typeParams.size()) + 
+                " type parameter(s), got " + std::to_string(n.args.size()), n.pos));
             return std::nullopt;
         }
 
         std::vector<sPtr<TypeInfo>> resolvedArgs;
         bool hasError = false;
-        for(const auto& arg: n->args){
+        for(const auto& arg: n.args){
             auto resolved = resolveType(*arg, typeVarMap, errors);
 
             if(!resolved){
@@ -442,20 +487,27 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
         }
 
         if(hasError) return std::nullopt;
-        return makeGeneric(n->name, std::move(resolvedArgs));
+        return makeGeneric(n.name, std::move(resolvedArgs));
     }
 
-    if(auto* n = std::get_if<ListTypeNode>(&node.var)){
-        auto elem = resolveType(*n->elemType, typeVarMap, errors);
+std::optional<sPtr<TypeInfo>> Analyzer::resolveListType(const ListTypeNode& n, 
+    TypeVarMap typeVarMap, 
+    std::vector<SemanticError>& errors){
+
+        auto elem = resolveType(*n.elemType, typeVarMap, errors);
         if(!elem) return std::nullopt;
         return makeList(std::move(*elem));
+
     }
 
-    if(auto* n = std::get_if<TupleTypeNode>(&node.var)){
+std::optional<sPtr<TypeInfo>> Analyzer::resolveTupleType(const TupleTypeNode& n, 
+    TypeVarMap typeVarMap, 
+    std::vector<SemanticError>& errors){
+
         std::vector<sPtr<TypeInfo>> elems;
         bool hasError = false;
 
-        for(const auto& elem : n->elems){
+        for(const auto& elem : n.elems){
             auto resolved = resolveType(*elem, typeVarMap, errors);
            
             if(!resolved){
@@ -470,19 +522,21 @@ std::optional<sPtr<TypeInfo>> Analyzer::resolveType(const TypeNode& node,
         return makeTuple(std::move(elems));
     }
 
-    if(auto* n = std::get_if<FunctionTypeNode>(&node.var)){
-        auto from = resolveType(*n->from, typeVarMap, errors);
-        auto to = resolveType(*n->to, typeVarMap, errors);
+std::optional<sPtr<TypeInfo>> Analyzer::resolveFunctionType(const FunctionTypeNode& n, 
+    TypeVarMap typeVarMap, 
+    std::vector<SemanticError>& errors){
+
+        auto from = resolveType(*n.from, typeVarMap, errors);
+        auto to = resolveType(*n.to, typeVarMap, errors);
         if(!from || !to) return std::nullopt;
         return makeFunction(std::move(*from), std::move(*to));
+        
     }
 
-    return std::nullopt;
-
-}
 
 
-//анализирование объявлений(а на деле это второй проход и функций)
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//анализирование объявлений(а на деле это второй проход функций и модуля)
 //псевдонимы и ADT зарегетсрированы в m_registry, нужно проверить только тела
 void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors){
     if(const auto* fn = std::get_if<FuncDecl>(&decl.var)){
@@ -494,10 +548,9 @@ void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vec
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//анализ объявлений
 
-
-
-//функции анализации
 //analyzeFuncDecl - проверка тела функции
 void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto funcEnv = std::make_shared<Environment>(env); 
@@ -523,16 +576,21 @@ void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::v
     }
 
     //проверка тела функции
+    checkFuncBody(fn, funcEnv, errors);
+}
+
+void Analyzer::checkFuncBody(const FuncDecl& fn, sPtr<Environment> funcEnv, std::vector<SemanticError>& errors){
+    //проверка тела функции
     auto bodyType = analyzeExpr(*fn.body, funcEnv, errors);
-    if(bodyType){
-        auto expectedType = resolveType(**fn.returnType, {}, errors);
-        if(expectedType && !typesCompatible(**bodyType, **expectedType)){
-            errors.push_back(makeError(
-                "function '" + fn.name + "'body type '" + 
-                (*bodyType)->toString() + "'does not match declared return type '" + 
-                (*expectedType)->toString() + "'", fn.pos));
-        }
-    } 
+    if(!bodyType) return;
+
+    auto expectedType = resolveType(**fn.returnType, {}, errors);
+    if(expectedType && !typesCompatible(**bodyType, **expectedType)){
+        errors.push_back(makeError(
+            "function '" + fn.name + "'body type '" + 
+            (*bodyType)->toString() + "'does not match declared return type '" + 
+            (*expectedType)->toString() + "'", fn.pos));
+    }
 }
 
 //type Name = unknownType - прекратим выполнение функции без регстрации псевдонима
@@ -546,7 +604,7 @@ void Analyzer::analyzeAliasDecl(const TypeAliasDecl& alias, std::vector<Semantic
     }
 }
 
-
+//Data Types declaration
 void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors){
     DataTypeInfo info; //информацию собираем о дата-типе
 
@@ -554,26 +612,10 @@ void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>&
     info.typeParams = data.typeParams;
 
 
-    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
-    //тут пригодится таблица параметров типа для разрешения полей конструктора
-    for(const auto& tp : data.typeParams){
-        typeVarMap[tp] = makeSimple(tp); //не неизвестный тип, а simpleType
-    }
+   auto typeVarMap = buildTypeVarMap(data.typeParams);
 
     for(const auto& ctor : data.constructors){
-        ConstructorInfo ctorInfo;
-        ctorInfo.name = ctor.name; 
-        ctorInfo.dataName = data.name; //имя дата типа которому принадлежит конструктор
-        ctorInfo.isNamed = ctor.isNamed;
-
-        for(const auto& field : ctor.fields){
-            auto fieldType = resolveType(*field.type, typeVarMap, errors);
-            if(!fieldType) continue; //если тип не удалось разрешить
-            ctorInfo.fieldTypes.push_back(*fieldType);
-            ctorInfo.fieldNames.push_back(field.name);
-        }
-
-        info.constructors.push_back(std::move(ctorInfo));
+        info.constructors.push_back(buildConstructorInfo(ctor, data.name, typeVarMap, errors));
     }
 
     if(!m_registry.registerData(std::move(info))){
@@ -582,6 +624,36 @@ void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>&
     }
 }
 
+ConstructorInfo Analyzer::buildConstructorInfo(const ConstructorDecl& ctor, const std::string& dataName,
+    const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors){
+
+    ConstructorInfo ctorInfo;
+    ctorInfo.name = ctor.name; 
+    ctorInfo.dataName = dataName; //имя дата типа которому принадлежит конструктор
+    ctorInfo.isNamed = ctor.isNamed;
+
+    for(const auto& field : ctor.fields){
+        auto fieldType = resolveType(*field.type, typeVarMap, errors);
+        if(!fieldType) continue; //если тип не удалось разрешить
+        ctorInfo.fieldTypes.push_back(*fieldType);
+        ctorInfo.fieldNames.push_back(field.name);
+    }
+
+    return ctorInfo;
+}
+
+static std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std::vector<std::string>& typeParams){
+    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+    
+    //тут пригодится таблица параметров типа для разрешения полей конструктора
+    for(const auto& tp : typeParams){
+        typeVarMap[tp] = makeSimple(tp); //не неизвестный тип, а simpleType - пока заглушка
+    }
+
+    return typeVarMap;
+}
+
+//Module
 void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto it = m_moduleEnvs.find(mod.name);
     if(it == m_moduleEnvs.end()){
@@ -590,92 +662,33 @@ void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, s
         return;
     }
 
-    auto modEnv = it->second;
-
     //второй проход - проверяем тела всех объявлений внутри модуля
     for(const auto& decl : mod.decls){
-        analyzeDecl(*decl, modEnv, errors);
+        analyzeDecl(*decl, it->second, errors);
     }
 }
 
 
-//анализатор выражений
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//анализ выражений
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
     const ExprNode& expr, sPtr<Environment> env, std::vector<SemanticError>& errors){
         
     std::optional<sPtr<TypeInfo>> result;
 
-    if(const auto* e = std::get_if<LiteralExpr>(&expr.var)){
-        if(std::get_if<long long>(&e->value)) result = makeBuiltin("int64");
-        if(std::get_if<double>(&e->value)) result = makeBuiltin("float64");
-        if(std::get_if<std::string>(&e->value)) result = makeBuiltin("string");
-        if(std::get_if<bool>(&e->value)) result = makeBuiltin("bool");
-        if(std::get_if<std::monostate>(&e->value)) result = makeBuiltin("unit");
-    }
-
-    else if(const auto* e = std::get_if<IdentExpr>(&expr.var)){
-        auto symbol = env->lookup(e->name);
-        if(!symbol){
-            errors.push_back(makeError(
-                "undefined variable '" + e->name + "'", e->pos));
-            return std::nullopt;
-        }
-
-        //встроенные функции нельзя использовать как значения
-        if(e->name == "print" || e->name == "input" || 
-            e->name == "exit"  || e->name == "panic" || 
-            e->name == "input_int" || e->name == "input_float"){
-            errors.push_back(makeError(
-                "'" + e->name + "' must be called with ()", e->pos));
-            return std::nullopt;
-        }
-
-        result = symbol->type; //тип идентификатора возвращаем
-    }
-
-    else if(const auto* e = std::get_if<UnaryExpr>(&expr.var)){
-        result = analyzeUnary(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<BinaryExpr>(&expr.var)){
-        result = analyzeBinary(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<CallExpr>(&expr.var)){
-        result = analyzeCall(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
-        result = analyzeFieldAccess(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<IfExpr>(&expr.var)){
-        result =  analyzeIf(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<MatchExpr>(&expr.var)){
-        result = analyzeMatch(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<LetInExpr>(&expr.var)){
-        result = analyzeLetIn(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<LambdaExpr>(&expr.var)){
-        result = analyzeLambda(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<TupleExpr>(&expr.var)){
-        result = analyzeTuple(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<ListExpr>(&expr.var)){
-        result = analyzeList(*e, env, errors);
-    }
-
-    else if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)){
-        result = analyzeConstructor(*e, env, errors);
-    }
+    if(const auto* e = std::get_if<LiteralExpr>(&expr.var)) result = analyzeLiteral(*e);
+    else if(const auto* e = std::get_if<IdentExpr>(&expr.var)) result = analyzeIdent(*e, env, errors);
+    else if(const auto* e = std::get_if<UnaryExpr>(&expr.var)) result = analyzeUnary(*e, env, errors);
+    else if(const auto* e = std::get_if<BinaryExpr>(&expr.var)) result = analyzeBinary(*e, env, errors);
+    else if(const auto* e = std::get_if<CallExpr>(&expr.var)) result = analyzeCall(*e, env, errors);
+    else if(const auto* e = std::get_if<FieldAccessExpr>(&expr.var)) result = analyzeFieldAccess(*e, env, errors);
+    else if(const auto* e = std::get_if<IfExpr>(&expr.var)) result =  analyzeIf(*e, env, errors);
+    else if(const auto* e = std::get_if<MatchExpr>(&expr.var)) result = analyzeMatch(*e, env, errors);
+    else if(const auto* e = std::get_if<LetInExpr>(&expr.var)) result = analyzeLetIn(*e, env, errors);
+    else if(const auto* e = std::get_if<LambdaExpr>(&expr.var)) result = analyzeLambda(*e, env, errors);
+    else if(const auto* e = std::get_if<TupleExpr>(&expr.var)) result = analyzeTuple(*e, env, errors);
+    else if(const auto* e = std::get_if<ListExpr>(&expr.var)) result = analyzeList(*e, env, errors);
+    else if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)) result = analyzeConstructor(*e, env, errors);
 
     if(result && *result){
         m_exprTypes[&expr] = *result; //сохраняем тип
@@ -684,10 +697,38 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
     return result; //может быть и nullopt
 }
 
+//вспомогательные
+static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
+    if(std::get_if<long long>(&e.value)) return makeBuiltin("int64");
+    if(std::get_if<double>(&e.value)) return makeBuiltin("float64");
+    if(std::get_if<std::string>(&e.value)) return makeBuiltin("string");
+    if(std::get_if<bool>(&e.value)) return makeBuiltin("bool");
+    if(std::get_if<std::monostate>(&e.value)) return makeBuiltin("unit");
+    return std::nullopt;
+}
 
+//Ident
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeIdent(const IdentExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    auto symbol = env->lookup(e.name);
+    if(!symbol){
+        errors.push_back(makeError(
+            "undefined variable '" + e.name + "'", e.pos));
+        return std::nullopt;
+    }
+
+    //встроенные функции нельзя использовать как значения
+    if(e.name == "print" || e.name == "input" || 
+        e.name == "exit"  || e.name == "panic" || 
+        e.name == "input_int" || e.name == "input_float"){
+        errors.push_back(makeError(
+            "'" + e.name + "' must be called with ()", e.pos));
+        return std::nullopt;
+    }
+
+    return symbol -> type; //тип идентификатора возвращаем - написан при объявлении - таблица символов
+}
 
 //analyzeIf
-
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeIf(
     const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
         
@@ -758,166 +799,207 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
     auto rightType = analyzeExpr(*e.right, env, errors);
     if(!leftType || !rightType) return std::nullopt; //неизвестная переменная, невалидный вызов функции, вложенная ошибка
 
-    //арифметические операторы
-    if(e.op == BinaryOp::Add || e.op == BinaryOp::Sub || e.op == BinaryOp::Mul ||
-        e.op == BinaryOp::Div || e.op == BinaryOp::Mod){
-        
-        if(!isNumericType(**leftType)){
-            errors.push_back(makeError(
-                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
-                (*leftType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        if(!typesCompatible(**leftType, **rightType)){
-            errors.push_back(makeError(
-                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
-                (*leftType)->toString() + "' and '" + 
-                (*rightType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        return *leftType; //тип левого так как оба уже проверили
-    }
-
-    if(e.op == BinaryOp::Lt || e.op == BinaryOp::Le ||
-        e.op == BinaryOp::Ge || e.op == BinaryOp::Gt){
-            
-        if(!isNumericType(**leftType)){ 
-            errors.push_back(makeError(
-                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
-                (*leftType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-            //со строками - лексикографически не вижу пока смысла работать
-
-        if(!typesCompatible(**leftType, **rightType)){
-            errors.push_back(makeError(
-                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
-                (*leftType)->toString() + "' and '" + 
-                (*rightType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        return makeBuiltin("bool");
-    }
-
-    if(e.op == BinaryOp::Eq || e.op == BinaryOp::Neq){
-        
-        if(!typesCompatible(**leftType, **rightType)){
-            errors.push_back(makeError(
-                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
-                (*leftType)->toString() + "' and '" + 
-                (*rightType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        return makeBuiltin("bool");
-    }
-
-    //логические операторы
-    if(e.op == BinaryOp::And || e.op == BinaryOp::Or){
-
-
-        if(!isBoolType(**leftType)){
-            errors.push_back(makeError(
-                "'" + binaryOpToString(e.op) + "' requires bool, got '" + 
-                (*leftType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        if(!isBoolType(**rightType)){
-            errors.push_back(makeError(
-                "'" + binaryOpToString(e.op) + "' requires bool, got '" + 
-                (*rightType)->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        return makeBuiltin("bool");
-    }
+    if(isArithmetic(e.op)) return checkArithmetic(e, *leftType, *rightType, errors);
+    if(isComparison(e.op)) return checkComparison(e, *leftType, *rightType, errors);
+    if(isEquality(e.op)) return checkEquality(e, *leftType, *rightType, errors);
+    if(isLogical(e.op)) return checkLogical(e, *leftType, *rightType, errors);
 
     return std::nullopt;
 }
 
+//вспомогательные функции
+
+static bool isArithmetic(BinaryOp op){
+    return op == BinaryOp::Add || op == BinaryOp::Sub || 
+           op == BinaryOp::Mul || op == BinaryOp::Div || op == BinaryOp::Mod;
+}
+
+static bool isComparison(BinaryOp op){
+    return op == BinaryOp::Lt || op == BinaryOp::Le ||
+           op == BinaryOp::Gt || op == BinaryOp::Ge;
+}
+
+static bool isEquality(BinaryOp op){
+    return op == BinaryOp::Eq || op == BinaryOp::Neq;
+}
+
+static bool isLogical(BinaryOp op){
+    return op == BinaryOp::And || op == BinaryOp::Or;
+}
+
+//реализуем каждую группу операторов
+
+std::optional<sPtr<TypeInfo>> Analyzer::checkArithmetic(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+    const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors){
+
+        if(!isNumericType(*left)){
+            errors.push_back(makeError(
+                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
+                left->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        if(!typesCompatible(*left, *right)){
+            errors.push_back(makeError(
+                "operator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                left->toString() + "' and '" + 
+                right->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return left; //тип левого так как оба уже проверили
+    }
+
+std::optional<sPtr<TypeInfo>> Analyzer::checkComparison(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+    const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors){
+
+        if(!isNumericType(*left)){ 
+            errors.push_back(makeError(
+                "operator '" + binaryOpToString(e.op) + "' requires numeric type, got '" + 
+                left->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        //со строками - лексикографически не вижу пока смысла работать
+
+        if(!typesCompatible(*left, *right)){
+            errors.push_back(makeError(
+                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                left->toString() + "' and '" + 
+                right->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin("bool");
+    }
+
+
+std::optional<sPtr<TypeInfo>> Analyzer::checkEquality(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+    const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors){
+
+        if(!typesCompatible(*left, *right)){
+            errors.push_back(makeError(
+                "opeator '" + binaryOpToString(e.op) + "' operands have different types: '" + 
+                left->toString() + "' and '" + 
+                right->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin("bool");
+    }
+
+std::optional<sPtr<TypeInfo>> Analyzer::checkLogical(const BinaryExpr& e, const sPtr<TypeInfo>& left,
+    const sPtr<TypeInfo>& right, std::vector<SemanticError>& errors){
+
+        if(!isBoolType(*left) || !isBoolType(*right)){
+            errors.push_back(makeError(
+                "'" + binaryOpToString(e.op) + "' requires bool, got '" + 
+                (!isBoolType(*left) ? left->toString() : right->toString()) + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin("bool");    
+    }
+
+
 
 //analyzeCall 
-//Для вызываемой функции 
+//Для вызываемой функции - для встроенных функций
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
-    //обработка print - вынесу в отдельную функцию 
-    //перехватываем тип до того, как общая логика проверяет тип
     if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
-        if(ident->name == "print"){
-            if(e.args.size() != 1){
-                errors.push_back(makeError("print expects 1 argument", e.pos));
-                return std::nullopt;
-            }
-
-            //вызываем анализ аргумента, чтобы запомнить тип для m_exprTypes
-            auto argType = analyzeExpr(*e.args[0], env, errors);
-            if(!argType) return std::nullopt;
-
-            if(const auto* bt = std::get_if<BuiltinType>(&(*argType)->var)){
-                if(bt->name != "int64" && bt->name != "float64" && 
-                    bt->name != "string" && bt->name != "bool"){
-                    errors.push_back(makeError(
-                        "print does not support type '" + (*argType)->toString() + "'", e.pos));
-                    return std::nullopt;
-                }
-            }
-            return makeBuiltin("unit"); //своебрзная заглушка, так как тип пока не знаем
-        } 
-
-        if(ident->name == "input_int"){
-            if(!e.args.empty()){
-                errors.push_back(makeError("input_int expects no arguments", e.pos));
-                return std::nullopt;
-            }
-            return makeBuiltin("int64");
-        }
-
-        if(ident->name == "input_float"){
-            if(!e.args.empty()){
-                errors.push_back(makeError("input_float expects no arguments", e.pos));
-                return std::nullopt;
-            }
-            return makeBuiltin("float64");
-        }
+        auto builtin = analyzeCallBuiltin(*ident, e, env, errors);
+        if(builtin) return builtin;
     }
+    
+    //тип вызываемого add - add(1, 2)
+    auto calleeType = analyzeExpr(*e.callee, env, errors); //из окружения получим Тип int64 -> int64 -> int64 
 
-
-    auto calleeType = analyzeExpr(*e.callee, env, errors); //возвратит тип add(1, 2) IdentExpr("add") - в окружении найдет add с типом
     if(!calleeType) return std::nullopt;
 
-    auto currentType = *calleeType; //передаем имя вызываемой функции
-
-    //каждый аргумент вызываемой функции сопоставляется с полностью прописанной версией функции
-    for(const auto& arg : e.args){ //каждый аргумент || x: int64, flag: bool smth(50, nope)
-        auto* funcType = std::get_if<FunctionType>(&currentType->var); //functype = makeFunction(int64, makeFunct(int64, int64))
-        if(!funcType){
-            errors.push_back(makeError(
-                "'" + (*calleeType)->toString() + "' is not a function and can`t be callled", e.pos));
-            return std::nullopt;
-        }
-
-        auto argType = analyzeExpr(*arg, env, errors);
-        if(!argType) return std::nullopt; //тип аргумента не удалось получить
-    
-        if(!typesCompatible(*funcType->from, **argType)){
-            errors.push_back(makeError(
-                "argument type '" + (*argType)->toString() + 
-                "' does not match expected type '" + 
-                funcType->from->toString() + "'", e.pos));
-            return std::nullopt;
-        }
-
-        currentType = funcType->to;
-    }
-
-    return currentType;
+    return analyzeCallArgs(e, *calleeType, env, errors);
 }
+
+//вспомогательные функции analyzeCall()
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallPrint(const CallExpr& e, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+       if(e.args.size() != 1){
+            errors.push_back(makeError("print expects 1 argument", e.pos));
+            return std::nullopt;
+        }
+
+        //вызываем анализ аргумента, чтобы запомнить тип для m_exprTypes
+        auto argType = analyzeExpr(*e.args[0], env, errors);
+        if(!argType) return std::nullopt;
+
+        if(const auto* bt = std::get_if<BuiltinType>(&(*argType)->var)){
+            if(bt->name != "int64" && bt->name != "float64" && 
+                bt->name != "string" && bt->name != "bool"){
+                errors.push_back(makeError(
+                    "print does not support type '" + (*argType)->toString() + "'", e.pos));
+                return std::nullopt;
+            }
+        }
+        return makeBuiltin("unit"); //своебрзная заглушка, так как тип пока не знаем 
+}
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallInput(const std::string& name, const CallExpr& e,
+    const std::string& retType, std::vector<SemanticError>& errors){
+
+        if(!e.args.empty()){
+            errors.push_back(makeError(name + " expects no arguments", e.pos));
+            return std::nullopt;
+        }
+
+        return makeBuiltin(retType);
+    }
+        
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallBuiltin(const IdentExpr& ident, const CallExpr& e, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        if(ident.name == "print") return analyzeCallPrint(e, env, errors);
+        if(ident.name == "input_int") return analyzeCallInput("input_int", e, "int64", errors);
+        if(ident.name == "input_float") return analyzeCallInput("input_float", e, "float64", errors);
+        return std::nullopt; //не встроенная функция
+
+        }
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        auto currentType = calleeType; //передаем имя вызываемой функции
+
+        //каждый аргумент вызываемой функции сопоставляется с полностью прописанной версией функции
+        for(const auto& arg : e.args){ //каждый аргумент || x: int64, flag: bool smth(50, nope)
+            auto* funcType = std::get_if<FunctionType>(&currentType->var); //functype = makeFunction(int64, makeFunct(int64, int64))
+
+            if(!funcType){
+                errors.push_back(makeError(
+                    "'" + calleeType->toString() + "' is not a function and can`t be callled", e.pos));
+                return std::nullopt;
+            }
+
+            auto argType = analyzeExpr(*arg, env, errors);
+            if(!argType) return std::nullopt; //тип аргумента не удалось получить
+        
+            if(!typesCompatible(*funcType->from, **argType)){
+                errors.push_back(makeError(
+                    "argument type '" + (*argType)->toString() + 
+                    "' does not match expected type '" + 
+                    funcType->from->toString() + "'", e.pos));
+                return std::nullopt;
+            }
+
+            currentType = funcType->to;
+        }
+
+        return currentType;
+}
+
+
+
 
 //если Math.add(1, 2) - identexpr, fieldaccess, callee
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
@@ -965,7 +1047,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
 }
 
 
-//analyzeMatch //все ветки одного типа, паттерны(шаблоны, образцы) совместимые с изначальным типом
+//analyzeMatch 
+//все ветки одного типа, паттерны(шаблоны, образцы) совместимые с изначальным типом
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
     const MatchExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
@@ -985,54 +1068,81 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
         auto bodyType = analyzeExpr(*arm.body, armEnv, errors);
         if(!bodyType) continue;
 
-        if(!resultType){
-            resultType = bodyType; //если первая типизированная ветка, то храним ее как ожидаемый тип
-        } else if(!typesCompatible(**resultType, **bodyType)){
-            errors.push_back(makeError(
-                "match arms have different types: " + 
-                (*resultType)->toString() + "' and '" + 
-                (*bodyType)->toString() + "'", arm.pos));
-        }
+        checkMatchArm(arm, resultType, *bodyType, errors);
     }
 
     return resultType;
 }
 
+//все ветки - одинаковый тип
+void Analyzer::checkMatchArm(const MatchArm& arm, std::optional<sPtr<TypeInfo>>& resultType, 
+    const sPtr<TypeInfo>& bodyType, std::vector<SemanticError>& errors){
+
+        if(!resultType){
+            resultType = bodyType; //если первая типизированная ветка, то храним ее как ожидаемый тип
+        } else if(!typesCompatible(**resultType, *bodyType)){
+            errors.push_back(makeError(
+                "match arms have different types: " + 
+                (*resultType)->toString() + "' and '" + 
+                bodyType->toString() + "'", arm.pos));
+        }
+
+}
+
+
+
 
 //analyze Let in
-
- std::optional<sPtr<TypeInfo>> Analyzer::analyzeLetIn(
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeLetIn(
     const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
     auto letEnv = std::make_shared<Environment>(env);
     
     for(const auto& binding : e.bindings){
-
-        //то, что справа от =
+        //"то, что справа от ="
         //let x: int64 = 5 + 3 in x BinaryExpr -> analyzeBinary -> int64
         auto valueType = analyzeExpr(*binding.value, letEnv, errors); 
         if(!valueType) continue;
 
-        if(binding.type){
-            auto annotationType = resolveType(**binding.type, {}, errors);
-            if(annotationType && !typesCompatible(**valueType, **annotationType)){
-                errors.push_back(makeError(
-                    "let binding '" + binding.name + "': value type '" + (*valueType)->toString() + 
-                    "'  does not match annotation '" + (*annotationType)->toString() + "'", binding.pos));
-                continue;
-            }
-        }
+        if(!checkLetAnnotation(binding, *valueType, errors)) continue;
+        defineLetBinding(binding, *valueType, letEnv, errors);
+    }
 
-        //let x = 5, x = 10 in x
+    return analyzeExpr(*e.body, letEnv, errors); //передаем внутреннее выражение - body
+}
+
+//вспомогательные функции analyzeLetIn()
+//тип значения совпадает с аннотацией || lex x: int64 = 5
+bool Analyzer::checkLetAnnotation(const LetBinding& binding, const sPtr<TypeInfo>& valueType, 
+    std::vector<SemanticError>& errors){
+
+        if(!binding.type) return true;
+
+        auto annotationType = resolveType(**binding.type, {}, errors);
+        if(annotationType && !typesCompatible(*valueType, **annotationType)){
+            errors.push_back(makeError(
+                "let binding '" + binding.name + "': value type '" + valueType->toString() + 
+                "'  does not match annotation '" + (*annotationType)->toString() + "'", binding.pos));
+            return false;
+        }
+        return true;
+}
+
+//добавляем в окружение (x с типом int64) 
+bool Analyzer::defineLetBinding(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+    sPtr<Environment> letEnv, std::vector<SemanticError>& errors){
+
+        //let x = 5, x = 10 in x - error
         if(!letEnv->define(binding.name, Symbol{binding.name, *valueType, false, binding.pos})){
             errors.push_back(makeError(
                 "'" + binding.name + "' is already declared in this scope", binding.pos));
-            continue;
+            return false;
         }
-    }
-
-    return analyzeExpr(*e.body, letEnv, errors); //передаем внутреннее выражение
+        
+        return true;
 }
+
+
 
 
 //analyzeLambda
@@ -1128,7 +1238,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
     }
 }
 
-
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeTuple(
     const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){ 
 
@@ -1148,7 +1257,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeTuple(
     return makeTuple(std::move(elemTypes));
     
 }
-
 
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
     const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){

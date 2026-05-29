@@ -1,12 +1,19 @@
-//5. Дано трёхзначное число. Выяснить, является ли оно палиндромом («перевёртышем»), т.е. таким числом
-// десятичная запись которого читается одинаково слева направо и справа налево.
+//16. даны натуральные число n и вещественные числа, определить количество отрицательных 
+//и количество положительных вещественных чисел
 
-fn isPalindrome(n: int64) -> bool = 
-    let a = n/100 in //env a = 1, n = 121
-    let b = (n / 10) % 10 in 
-    let c = n % 10 in 
-    a == c
+fn solve(xs: [float64], neg: int64, pos: int64) -> int64 =
+    match xs {
+        [] -> let _ = print(neg) in 
+              let _ = print(pos) in
+              0,
+        x : rest ->
+            if x < 0.0 
+                then solve(rest, neg + 1, pos)
+                else
+                    if x > 0.0 
+                        then solve(rest, neg, pos + 1)
+                        else solve(rest, neg, pos) //x = 0.0
+    }
 
 fn main() -> int64 =
-    let _ = print(if isPalindrome(122) then "palindrome\n" else "not palindrome\n") in
-    0
+    let _ = solve([35351.343, -253.4654, 33.3543, 6747.5760, -3674.34736476], 0, 0) in 0

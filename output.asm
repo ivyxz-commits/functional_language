@@ -2,13 +2,9 @@ section .data
 __malloc_err_len: dq 20
 __malloc_err_dat: db `out of memory error`, 0
 __str_0_len:
-    dq 11
+    dq 22
 __str_0_dat:
-    db `palindrome`, 10, ``, 0
-__str_1_len:
-    dq 15
-__str_1_dat:
-    db `not palindrome`, 10, ``, 0
+    db `match: no matching arm`, 0
 
 section .bss
     __read_buf: resb 4096
@@ -162,51 +158,124 @@ __lang_exit:
     mov rax, 60
     syscall
 
-__fn_isPalindrome:
+__fn_solve:
     push rbp
     mov rbp, rsp
-    sub rsp, 80
+    sub rsp, 192
     mov [rbp-8], rdi
-    mov rax, [rbp-8]
-    mov [rbp-16], rax
-    mov rax, 100
-    mov rcx, rax
-    mov rax, [rbp-16]
-    cqo
-    idiv rcx
-    mov [rbp-24], rax
+    mov [rbp-16], rsi
+    mov [rbp-24], rdx
     mov rax, [rbp-8]
     mov [rbp-32], rax
-    mov rax, 10
-    mov rcx, rax
     mov rax, [rbp-32]
-    cqo
-    idiv rcx
+    mov rcx, [rax]
+    cmp rcx, 0
+    jnz .match_next_1
+    mov rax, [rbp-16]
     mov [rbp-40], rax
-    mov rax, 10
-    mov rcx, rax
-    mov rax, [rbp-40]
-    cqo
-    idiv rcx
-    mov rax, rdx
+    mov rdi, [rbp-40]
+    call __lang_print_int
     mov [rbp-48], rax
-    mov rax, [rbp-8]
-    mov [rbp-56], rax
-    mov rax, 10
-    mov rcx, rax
-    mov rax, [rbp-56]
-    cqo
-    idiv rcx
-    mov rax, rdx
-    mov [rbp-64], rax
     mov rax, [rbp-24]
+    mov [rbp-56], rax
+    mov rdi, [rbp-56]
+    call __lang_print_int
+    mov [rbp-64], rax
+    mov rax, 0
+    jmp .match_end_0
+.match_next_1:
+    mov rax, [rbp-32]
+    mov rcx, [rax]
+    cmp rcx, 0
+    jz .match_next_2
     mov [rbp-72], rax
-    mov rax, [rbp-64]
-    mov rcx, rax
     mov rax, [rbp-72]
-    cmp rax, rcx
-    sete al
+    mov rcx, [rax + 8]
+    mov rax, rcx
+    mov [rbp-80], rax
+    mov rax, [rbp-72]
+    mov rcx, [rax + 16]
+    mov rax, rcx
+    mov [rbp-88], rax
+    ; genBinary isFloat=true
+    mov rax, [rbp-80]
+    mov [rbp-96], rax
+    mov rax, 0 ; float64 0.000000
+    movq xmm1, rax
+    mov rcx, rax
+    mov rax, [rbp-96]
+    movq xmm0, rax
+    ucomisd xmm0, xmm1
+    setb al
     movzx rax, al
+    cmp rax, 0
+    jz .else_3
+    mov rax, [rbp-88]
+    mov [rbp-104], rax
+    ; genBinary isFloat=false
+    mov rax, [rbp-16]
+    mov [rbp-112], rax
+    mov rax, 1
+    mov rcx, rax
+    mov rax, [rbp-112]
+    add rax, rcx
+    mov [rbp-120], rax
+    mov rax, [rbp-24]
+    mov [rbp-128], rax
+    mov rdi, [rbp-104]
+    mov rsi, [rbp-120]
+    mov rdx, [rbp-128]
+    call __fn_solve
+    jmp .endif_4
+.else_3:
+    ; genBinary isFloat=true
+    mov rax, [rbp-80]
+    mov [rbp-136], rax
+    mov rax, 0 ; float64 0.000000
+    movq xmm1, rax
+    mov rcx, rax
+    mov rax, [rbp-136]
+    movq xmm0, rax
+    ucomisd xmm0, xmm1
+    seta al
+    movzx rax, al
+    cmp rax, 0
+    jz .else_5
+    mov rax, [rbp-88]
+    mov [rbp-144], rax
+    mov rax, [rbp-16]
+    mov [rbp-152], rax
+    ; genBinary isFloat=false
+    mov rax, [rbp-24]
+    mov [rbp-160], rax
+    mov rax, 1
+    mov rcx, rax
+    mov rax, [rbp-160]
+    add rax, rcx
+    mov [rbp-168], rax
+    mov rdi, [rbp-144]
+    mov rsi, [rbp-152]
+    mov rdx, [rbp-168]
+    call __fn_solve
+    jmp .endif_6
+.else_5:
+    mov rax, [rbp-88]
+    mov [rbp-176], rax
+    mov rax, [rbp-16]
+    mov [rbp-184], rax
+    mov rax, [rbp-24]
+    mov [rbp-192], rax
+    mov rdi, [rbp-176]
+    mov rsi, [rbp-184]
+    mov rdx, [rbp-192]
+    call __fn_solve
+.endif_6:
+.endif_4:
+    jmp .match_end_0
+.match_next_2:
+    mov rdi, __str_0_len
+    call __lang_panic
+.match_end_0:
     mov rsp, rbp
     pop rbp
     ret
@@ -214,22 +283,82 @@ __fn_isPalindrome:
 __fn_main:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
-    mov rax, 122
+    sub rsp, 80
+    mov rdi, 8
+    call __lang_malloc
+    mov qword [rax], 0
     mov [rbp-8], rax
-    mov rdi, [rbp-8]
-    call __fn_isPalindrome
-    cmp rax, 0
-    jz .else_0
-    mov rax, __str_0_len
-    jmp .endif_1
-.else_0:
-    mov rax, __str_1_len
-.endif_1:
+    mov rax, 4660298390377805815 ; float64 3674.347365
+    movq xmm0, rax
+    mov rcx, 0x8000000000000000
+    movq xmm1, rcx
+    xorpd xmm0, xmm1
+    movq rax, xmm0
     mov [rbp-16], rax
-    mov rdi, [rbp-16]
-    call __lang_print_str
+    mov rdi, 24
+    call __lang_malloc
+    mov qword [rax], 1
+    mov rcx, [rbp-16]
+    mov [rax + 8], rcx
+    mov rcx, [rbp-8]
+    mov [rax + 16], rcx
+    mov [rbp-8], rax
+    mov rax, 4664141052972395135 ; float64 6747.576000
     mov [rbp-24], rax
+    mov rdi, 24
+    call __lang_malloc
+    mov qword [rax], 1
+    mov rcx, [rbp-24]
+    mov [rax + 8], rcx
+    mov rcx, [rbp-8]
+    mov [rax + 16], rcx
+    mov [rbp-8], rax
+    mov rax, 4629891017717349509 ; float64 33.354300
+    mov [rbp-32], rax
+    mov rdi, 24
+    call __lang_malloc
+    mov qword [rax], 1
+    mov rcx, [rbp-32]
+    mov [rax + 8], rcx
+    mov rcx, [rbp-8]
+    mov [rax + 16], rcx
+    mov [rbp-8], rax
+    mov rax, 4643122037509485022 ; float64 253.465400
+    movq xmm0, rax
+    mov rcx, 0x8000000000000000
+    movq xmm1, rcx
+    xorpd xmm0, xmm1
+    movq rax, xmm0
+    mov [rbp-40], rax
+    mov rdi, 24
+    call __lang_malloc
+    mov qword [rax], 1
+    mov rcx, [rbp-40]
+    mov [rax + 8], rcx
+    mov rcx, [rbp-8]
+    mov [rax + 16], rcx
+    mov [rbp-8], rax
+    mov rax, 4675091465168954065 ; float64 35351.343000
+    mov [rbp-48], rax
+    mov rdi, 24
+    call __lang_malloc
+    mov qword [rax], 1
+    mov rcx, [rbp-48]
+    mov [rax + 8], rcx
+    mov rcx, [rbp-8]
+    mov [rax + 16], rcx
+    mov [rbp-8], rax
+    mov rax, [rbp-8]
+    mov [rbp-56], rax
+    mov rax, 0
+    mov [rbp-64], rax
+    mov rax, 0
+    mov [rbp-72], rax
+    mov rdi, [rbp-56]
+    mov rsi, [rbp-64]
+    mov rdx, [rbp-72]
+    call __fn_solve
+    mov [rbp-80], rax
     mov rax, 0
     mov rsp, rbp
     pop rbp

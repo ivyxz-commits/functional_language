@@ -483,7 +483,7 @@ void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
         //потом addsd процессору - возьми нижние 64 бита и сложи их как double например
 
         //для регистр <- константа нужен movabs для 64 битных
-        emit("movabs rax, " + std::to_string(bits) + " ; float64 " + std::to_string(value)); //перекидываем сырые биты в rax 
+        emit("mov rax, " + std::to_string(bits) + " ; float64 " + std::to_string(value)); //перекидываем сырые биты в rax 
     }
 
     //строка - структура {length, data[]} - длина 8, дата столько сколько влезет
@@ -526,6 +526,7 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
             emit("mov rcx, 0x8000000000000000"); //маска для 1 старшого бита
             emit("movq xmm1, rcx"); //8 байт за одну операцию
             emit("xorpd xmm0, xmm1");
+            emit("movq rax, xmm0");
         } else {
             emit("neg rax");
         }
@@ -537,7 +538,7 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
 //Binary
 void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
     bool isFloat = isFloatExpr(*e.left) || isFloatExpr(*e.right);
-
+    emit("; genBinary isFloat=" + std::string(isFloat ? "true" : "false"));
     //левую часть на стек
     genExpr(*e.left, ctx);
 
@@ -980,10 +981,16 @@ void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
         std::string nextLabel = freshLabel("match_next"); //если эта не подошла
 
         emit("mov rax, [rbp" + std::to_string(targetOff) + "]");
-        genPattern(*arm.pattern, "rax", nextLabel, ctx); 
+
+        std::size_t localsBefore = ctx.locals.size();
+
+        genPattern(*arm.pattern, "rax", nextLabel, ctx);
+
 
         genExpr(*arm.body, ctx); //выполняем тело ветки если результат подошел
         emit("jmp " + endLabel);
+        
+        ctx.locals.resize(localsBefore);
 
         emitLabel(nextLabel); //следующая проверка если pattern не подошел
     }
@@ -1047,7 +1054,7 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
         else if(p->kind == LiteralPatternNode::Kind::Real){
             double value = std::stod(p->value);
             uint64_t bits = std::bit_cast<uint64_t>(value);
-            emit("movabs rcx, " + std::to_string(bits));
+            emit("mov rcx, " + std::to_string(bits));
             emit("cmp rax, rcx");
             emit("jne " + failLabel);
         }
@@ -1118,32 +1125,26 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
 
     //cons - pattern x : xs
     if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
+    if(valueReg != "rax") emit("mov rax, " + valueReg);
 
-        emit("mov rcx, [rax]");
-        emit("cmp rcx, 0");
-        emit("jz " + failLabel); //нулевой список не подойдет
+    emit("mov rcx, [rax]");
+    emit("cmp rcx, 0");
+    emit("jz " + failLabel);
 
-        emit("mov rcx, [rax + 8]"); //head
-        int headOff = ctx.allocLocal("__head");
-        emit("mov [rbp" + std::to_string(headOff) + "], rcx");
+    int listOff = ctx.allocLocal("__list");
+    emit("mov [rbp" + std::to_string(listOff) + "], rax");
 
-        
-        emit("mov rcx, [rax + 16]"); //tail
-        int tailOff = ctx.allocLocal("__tail");
-        emit("mov [rbp" + std::to_string(tailOff) + "], rcx");
+    emit("mov rax, [rbp" + std::to_string(listOff) + "]");
+    emit("mov rcx, [rax + 8]");
+    genPattern(*p->head, "rcx", failLabel, ctx);
 
-        emit("mov rax, [rbp" + std::to_string(headOff) + "]");
-        genPattern(*p->head, "rax", failLabel, ctx);
+    emit("mov rax, [rbp" + std::to_string(listOff) + "]");
+    emit("mov rcx, [rax + 16]");
+    genPattern(*p->tail, "rcx", failLabel, ctx);
 
-        emit("mov rax, [rbp" + std::to_string(tailOff) + "]");
-        genPattern(*p->tail, "rax", failLabel, ctx);
-
-        ctx.removeLocal("__head");
-        ctx.removeLocal("__tail");
-        return;
+    ctx.removeLocal("__list");
+    return;
     }
-
     //list [] или [1, 2, 3, ...]
     //проход в нормальном порядке в отличие от создания
     if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){
