@@ -178,6 +178,8 @@ private:
     SemanticError makeError(std::string msg, Pos pos) const;
 
 
+
+
     //разбор объявлений
 
     using TypeVarMap = const std::unordered_map<std::string, sPtr<TypeInfo>>&; //псевдоним для упрощения визуального
@@ -197,6 +199,8 @@ private:
     ConstructorInfo buildConstructorInfo(const ConstructorDecl& ctor, const std::string& dataName,
     const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
 
+
+
     //разбор образцов(шаблонов) //образец хороший если он структурно совместим с типом сопоставляемого значения
     //ConsPattern x : xs — хороший если expectedType это список, а иначе зачем нам внутрь заходить и проверять match и получать доп. ошибки
     bool analyzePattern(
@@ -211,6 +215,38 @@ private:
             None -> 0,
             Some(v) -> v + 1
     } */
+
+    //вспомогательные функции обработки образца
+    bool analyzeWildcardPattern();
+
+    bool analyzeLiteralPattern(const LiteralPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+        std::vector<SemanticError>& errors);
+
+    bool analyzeNamePattern(const NamePatternNode& p, const sPtr<TypeInfo>& expectedType, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    bool analyzeTuplePattern(const TuplePatternNode& p, const sPtr<TypeInfo>& expectedType, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    bool analyzeListPattern(const ListPatternNode& p, const sPtr<TypeInfo>& expectedType,
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    bool analyzeConsPattern(const ConsPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    bool analyzeConstructorPattern(const ConstructorPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    //вспомогательные функции для конструктора
+    bool checkConstructorOwnership(const ConstructorPatternNode& p, const ConstructorInfo& ctorInfo,
+        const sPtr<TypeInfo>& expectedType, std::vector<SemanticError>& errors);
+
+    bool checkConstructorPatternArgCount(const ConstructorPatternNode& p, const ConstructorInfo& ctorInfo,
+        std::vector<SemanticError>& errors);
+
+
+
+
 
     //разбор типов (TypeNode -> TypeInfo)
     std::optional<sPtr<TypeInfo>> resolveType(
@@ -243,14 +279,14 @@ private:
         std::vector<SemanticError>& errors);
 
 
+
+
+        
     //разбор выражений (тип выажения или nullopt)
     std::optional<sPtr<TypeInfo>> analyzeExpr(const ExprNode&, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeIdent(const IdentExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeIf(const IfExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeLambda(const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeUnary(const UnaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeFieldAccess(const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
-    std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeTuple(const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
@@ -304,9 +340,37 @@ private:
     void checkMatchArm(const MatchArm& arm, std::optional<sPtr<TypeInfo>>& resultType, 
         const sPtr<TypeInfo>& bodyType, std::vector<SemanticError>& errors);
 
+    ///////////////////////////////////////
+    //FieldAccess
+    std::optional<sPtr<TypeInfo>> analyzeFieldAccess(const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    std::optional<sPtr<TypeInfo>> accessModuleField(const IdentExpr& ident, 
+        const FieldAccessExpr& e, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> accessDataField(const sPtr<TypeInfo>& objType,
+        const FieldAccessExpr& e, std::vector<SemanticError>& errors);
+
+    
+    ///////////////////////////////////////
+    //Constructor
+    std::optional<sPtr<TypeInfo>> analyzeConstructor(const ConstructorExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательные
+    void checkConstructorArgs(const ConstructorExpr& e, const ConstructorInfo& ctorInfo, sPtr<Environment> env, 
+        std::vector<SemanticError>& errors);
+
+    bool checkConstructorArgCount(const ConstructorExpr& e, const ConstructorInfo& ctorInfo,
+        std::vector<SemanticError>& errors);
+
+    ///////////////////////////////////////
+    //Lambda
+    std::optional<sPtr<TypeInfo>> analyzeLambda(const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //вспомогательная
+    std::optional<std::vector<sPtr<TypeInfo>>> resolveLambdaParams(const LambdaExpr& e, sPtr<Environment> lambdaEnv, 
+        std::vector<SemanticError>& errors);
 
 
-    //вспомогательные функции
+
+    //Общие вспомогательные функции
     //функции проверки типов
     bool typesCompatible(const TypeInfo& a, const TypeInfo& b) const; //совместимость
     bool isNumericType(const TypeInfo& t) const;

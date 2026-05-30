@@ -2,6 +2,137 @@
 
 namespace Semantic{ 
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//вспомогательные static - функции
+
+
+//вывод типа из TypeInfo
+static std::string builtinToString(const BuiltinType& t){
+    return t.name;
+}
+
+static std::string simpleToString(const SimpleType& t){
+    return t.name;
+}
+
+static std::string genericToString(const GenericType& t){
+    std::string s = t.name + "[";
+    for(int i = 0; i < t.args.size(); i++){ 
+        if(i) s += ", ";
+        s += t.args[i]->toString();
+    }
+    return s + "]";
+}
+
+static std::string tupleToString(const TupleType& t){
+    std::string s = "(";
+    for(int i = 0; i < t.elems.size(); i++){ 
+        if(i) s += ", ";
+        s += t.elems[i]->toString();
+    }
+    return s + ")";
+}
+
+static std::string listToString(const ListType& t){
+    return "[" + t.elem->toString() + "]";
+}
+
+static std::string functionToString(const FunctionType& t){
+    return t.from->toString() + " -> " + t.to->toString();
+}
+
+
+//analyze()
+static bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
+    
+    for(const auto& decl : decls){
+        if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
+            if(fn->name == "main") return true;
+        }
+    }
+
+    return false;
+}
+
+static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
+    if(decls.empty()) return {1, 1};
+    
+    const auto& last = decls.back()->var;
+    
+    if(const auto* func = std::get_if<FuncDecl>(&last)) return func->pos;
+    if(const auto* mod = std::get_if<ModuleDecl>(&last)) return mod->pos;
+    if(const auto* data = std::get_if<DataDecl>(&last)) return data->pos;
+    if(const auto* alias = std::get_if<TypeAliasDecl>(&last)) return alias->pos;
+    
+    __builtin_unreachable();
+}
+
+
+//analyzeExpr()
+static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
+    if(std::get_if<long long>(&e.value)) return makeBuiltin("int64");
+    if(std::get_if<double>(&e.value)) return makeBuiltin("float64");
+    if(std::get_if<std::string>(&e.value)) return makeBuiltin("string");
+    if(std::get_if<bool>(&e.value)) return makeBuiltin("bool");
+    if(std::get_if<std::monostate>(&e.value)) return makeBuiltin("unit");
+    return std::nullopt;
+}
+
+
+//analyzeDataDecl()
+static std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std::vector<std::string>& typeParams){
+    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+    
+    //тут пригодится таблица параметров типа для разрешения полей конструктора
+    for(const auto& tp : typeParams){
+        typeVarMap[tp] = makeSimple(tp); //не неизвестный тип, а simpleType - пока заглушка
+    }
+
+    return typeVarMap;
+}
+
+
+//analyzeBinary()
+static bool isArithmetic(BinaryOp op){
+    return op == BinaryOp::Add || op == BinaryOp::Sub || 
+           op == BinaryOp::Mul || op == BinaryOp::Div || op == BinaryOp::Mod;
+}
+
+static bool isComparison(BinaryOp op){
+    return op == BinaryOp::Lt || op == BinaryOp::Le ||
+           op == BinaryOp::Gt || op == BinaryOp::Ge;
+}
+
+static bool isEquality(BinaryOp op){
+    return op == BinaryOp::Eq || op == BinaryOp::Neq;
+}
+
+static bool isLogical(BinaryOp op){
+    return op == BinaryOp::And || op == BinaryOp::Or;
+}
+
+
+//analyzeLambda()
+
+//int64 -> (int64 -> int64) - потом обход слева направо
+static sPtr<TypeInfo> buildLambdaType(const std::vector<sPtr<TypeInfo>>& paramTypes, sPtr<TypeInfo> bodyType){
+    //идем справа налево, что получили, что возвратили
+    sPtr<TypeInfo> funcType = bodyType;
+    //так как лямбда это функция, то ее тип должен быть FunctionType
+    for(int i = static_cast<int>(paramTypes.size()) - 1; i >= 0; i--){
+        funcType = makeFunction(paramTypes[i], funcType); //первый проход там bodyType
+    }
+
+    return funcType; // -> ... -> ... -> ......
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 //реализация вспомогательных конструкторов для TypeInfo
 sPtr<TypeInfo> makeBuiltin(const std::string& name){
     return std::make_shared<TypeInfo>(TypeInfo{BuiltinType{name}});
@@ -82,6 +213,18 @@ bool TypeInfo::equals(const TypeInfo& other) const {
 } */
 
 
+std::string TypeInfo::toString() const{ 
+
+    if(auto* t = std::get_if<BuiltinType>(&var)) return builtinToString(*t);
+    if(auto* t = std::get_if<SimpleType>(&var)) return simpleToString(*t);
+    if(auto* t = std::get_if<GenericType>(&var)) return genericToString(*t);
+    if(auto* t = std::get_if<TupleType>(&var)) return tupleToString(*t);
+    if(auto* t = std::get_if<ListType>(&var)) return listToString(*t);
+    if(auto* t = std::get_if<FunctionType>(&var)) return functionToString(*t);
+
+    __builtin_unreachable(); //недостижим, хотя бы один из variant подойдет 
+}
+
 //красивый вывод ошибок
 std::string Analyzer::binaryOpToString(Parser::BinaryOp op){
     switch(op){
@@ -101,52 +244,6 @@ std::string Analyzer::binaryOpToString(Parser::BinaryOp op){
     }
     __builtin_unreachable();
 }
-
-//вывод типа из TypeInfo
-std::string TypeInfo::toString() const{
-    if(auto* t = std::get_if<BuiltinType>(&var)) return builtinToString(*t); //&this -> var - указатель на текущий объект
-    if(auto *t = std::get_if<SimpleType>(&var)) return simpleToString(*t);
-    if(auto *t = std::get_if<GenericType>(&var)) return genericToString(*t);
-    if(auto* t = std::get_if<TupleType>(&var)) return tupleToString(*t);
-    if(auto* t = std::get_if<ListType>(&var)) return listToString(*t);
-    if(auto *t = std::get_if<FunctionType>(&var)) return functionToString(*t);
-    return "<unknown>";
-}
-
-static std::string builtinToString(const BuiltinType& t){
-    return t.name;
-}
-
-static std::string simpleToString(const SimpleType& t){
-    return t.name;
-}
-
-static std::string genericToString(const GenericType& t){
-    std::string s = t.name + "[";
-    for(int i = 0; i < t.args.size(); i++){ 
-        if(i) s += ", ";
-        s += t.args[i]->toString();
-    }
-    return s + "]";
-}
-
-static std::string tupleToString(const TupleType& t){
-    std::string s = "(";
-    for(int i = 0; i < t.elems.size(); i++){ 
-        if(i) s += ", ";
-        s += t.elems[i]->toString();
-    }
-    return s + ")";
-}
-
-static std::string listToString(const ListType& t){
-    return "[" + t.elem->toString() + "]";
-}
-
-static std::string functionToString(const FunctionType& t){
-    return t.from->toString() + " -> " + t.to->toString();
-}
-
 
 
 //окружение
@@ -380,30 +477,6 @@ std::vector<SemanticError> Analyzer::analyze(const Program& prog){
     }
 
     return errors;
-}
-
-static bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
-    
-    for(const auto& decl : decls){
-        if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
-            if(fn->name == "main") return true;
-        }
-    }
-
-    return false;
-}
-
-static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
-    if(decls.empty()) return {1, 1};
-    
-    const auto& last = decls.back()->var;
-    
-    if(const auto* func = std::get_if<FuncDecl>(&last)) return func->pos;
-    if(const auto* mod = std::get_if<ModuleDecl>(&last)) return mod->pos;
-    if(const auto* data = std::get_if<DataDecl>(&last)) return data->pos;
-    if(const auto* alias = std::get_if<TypeAliasDecl>(&last)) return alias->pos;
-    
-    __builtin_unreachable();
 }
 
 
@@ -642,17 +715,6 @@ ConstructorInfo Analyzer::buildConstructorInfo(const ConstructorDecl& ctor, cons
     return ctorInfo;
 }
 
-static std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std::vector<std::string>& typeParams){
-    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
-    
-    //тут пригодится таблица параметров типа для разрешения полей конструктора
-    for(const auto& tp : typeParams){
-        typeVarMap[tp] = makeSimple(tp); //не неизвестный тип, а simpleType - пока заглушка
-    }
-
-    return typeVarMap;
-}
-
 //Module
 void Analyzer::analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto it = m_moduleEnvs.find(mod.name);
@@ -698,14 +760,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
 }
 
 //вспомогательные
-static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
-    if(std::get_if<long long>(&e.value)) return makeBuiltin("int64");
-    if(std::get_if<double>(&e.value)) return makeBuiltin("float64");
-    if(std::get_if<std::string>(&e.value)) return makeBuiltin("string");
-    if(std::get_if<bool>(&e.value)) return makeBuiltin("bool");
-    if(std::get_if<std::monostate>(&e.value)) return makeBuiltin("unit");
-    return std::nullopt;
-}
 
 //Ident
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeIdent(const IdentExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
@@ -727,6 +781,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeIdent(const IdentExpr& e, sPtr<En
 
     return symbol -> type; //тип идентификатора возвращаем - написан при объявлении - таблица символов
 }
+
+
 
 //analyzeIf
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeIf(
@@ -754,6 +810,8 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeIf(
 
     return *thenType;
 }
+
+
 
 //analyzeUnary
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeUnary(
@@ -807,25 +865,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeBinary(
     return std::nullopt;
 }
 
-//вспомогательные функции
-
-static bool isArithmetic(BinaryOp op){
-    return op == BinaryOp::Add || op == BinaryOp::Sub || 
-           op == BinaryOp::Mul || op == BinaryOp::Div || op == BinaryOp::Mod;
-}
-
-static bool isComparison(BinaryOp op){
-    return op == BinaryOp::Lt || op == BinaryOp::Le ||
-           op == BinaryOp::Gt || op == BinaryOp::Ge;
-}
-
-static bool isEquality(BinaryOp op){
-    return op == BinaryOp::Eq || op == BinaryOp::Neq;
-}
-
-static bool isLogical(BinaryOp op){
-    return op == BinaryOp::And || op == BinaryOp::Or;
-}
 
 //реализуем каждую группу операторов
 
@@ -1000,7 +1039,6 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<
 
 
 
-
 //если Math.add(1, 2) - identexpr, fieldaccess, callee
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
     const FieldAccessExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
@@ -1009,42 +1047,60 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeFieldAccess(
     if(!objType) return std::nullopt;
 
     if(const auto* ident = std::get_if<IdentExpr>(&e.object->var)){
-        auto it = m_moduleEnvs.find(ident->name);
-        if(it != m_moduleEnvs.end()){
-            auto symbol = it->second->lookupLocal(e.field); //add
-            if(!symbol){
-                errors.push_back(makeError(
-                    "module '" + ident->name + "' has no member '" + e.field + "'", e.pos));
-                return std::nullopt;
-            }
-            return symbol->type; //вернется тип для последующего сравнения
-        }
+        auto result = accessModuleField(*ident, e, errors);
+        if(result) return result;
     }
 
     //иначе обычный доступ к полю именнованного конструктора
     //если это псевдоним, то раскрываем до настоящего типа
-    auto resolved = m_registry.resolveAlias(*objType);
-
-    if(const auto* st = std::get_if<SimpleType>(&resolved->var)){
-        auto data = m_registry.lookupData(st->name);
-
-        if(data) {
-            for(const auto& ctor : data->constructors){
-                if(!ctor.isNamed) continue;
-                for(int i = 0; i < ctor.fieldNames.size(); i++){
-                    if(ctor.fieldNames[i] == e.field){
-                        return ctor.fieldTypes[i];
-                    }
-                }
-            }
-        }
-    }
+    auto result = accessDataField(*objType, e, errors);
+    if(result) return result;
 
     errors.push_back(makeError(
             "type '" + (*objType)->toString() + "' has no field '" + e.field + "'", e.pos));
 
     return std::nullopt;
 }
+
+std::optional<sPtr<TypeInfo>> Analyzer::accessModuleField(const IdentExpr& ident, 
+    const FieldAccessExpr& e, std::vector<SemanticError>& errors){
+
+        auto it = m_moduleEnvs.find(ident.name);
+        if(it == m_moduleEnvs.end()) return std::nullopt;
+
+        auto symbol = it->second->lookupLocal(e.field); //add
+        if(!symbol){
+            errors.push_back(makeError(
+                "module '" + ident.name + "' has no member '" + e.field + "'", e.pos));
+            return std::nullopt;
+        }
+        return symbol->type; //вернется тип для последующего сравнения
+}
+
+std::optional<sPtr<TypeInfo>> Analyzer::accessDataField(const sPtr<TypeInfo>& objType,
+    const FieldAccessExpr& e, std::vector<SemanticError>& errors){
+
+
+        auto resolved = m_registry.resolveAlias(objType);
+
+        const auto* st = std::get_if<SimpleType>(&resolved->var);
+        if(!st) return std::nullopt;
+
+        auto data = m_registry.lookupData(st->name);
+        if(!data) return std::nullopt;
+
+        for(const auto& ctor : data -> constructors){
+            if(!ctor.isNamed) continue;
+            for(int i = 0; i < ctor.fieldNames.size(); i++){
+                if(ctor.fieldNames[i] == e.field){
+                    return ctor.fieldTypes[i];
+                }
+            }
+        }
+
+        return std::nullopt;
+}
+
 
 
 //analyzeMatch 
@@ -1064,11 +1120,11 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeMatch(
 
         analyzePattern(*arm.pattern, *targetType, armEnv, errors); //проверяем образец, связываем имя - 643 ожидает только литерал (не ctor) 
 
-        //само тело ветви от '->' справа
+        //само тело ветви от '->' справа || тело может возвращать что угодно
         auto bodyType = analyzeExpr(*arm.body, armEnv, errors);
         if(!bodyType) continue;
 
-        checkMatchArm(arm, resultType, *bodyType, errors);
+        checkMatchArm(arm, resultType, *bodyType, errors); //проверяем что все типы совпадают в MatchArm
     }
 
     return resultType;
@@ -1088,7 +1144,6 @@ void Analyzer::checkMatchArm(const MatchArm& arm, std::optional<sPtr<TypeInfo>>&
         }
 
 }
-
 
 
 
@@ -1133,7 +1188,7 @@ bool Analyzer::defineLetBinding(const LetBinding& binding, const sPtr<TypeInfo>&
     sPtr<Environment> letEnv, std::vector<SemanticError>& errors){
 
         //let x = 5, x = 10 in x - error
-        if(!letEnv->define(binding.name, Symbol{binding.name, *valueType, false, binding.pos})){
+        if(!letEnv->define(binding.name, Symbol{binding.name, valueType, false, binding.pos})){
             errors.push_back(makeError(
                 "'" + binding.name + "' is already declared in this scope", binding.pos));
             return false;
@@ -1144,46 +1199,48 @@ bool Analyzer::defineLetBinding(const LetBinding& binding, const sPtr<TypeInfo>&
 
 
 
-
-//analyzeLambda
- std::optional<sPtr<TypeInfo>>Analyzer::analyzeLambda(
+//analyzeLambda 
+std::optional<sPtr<TypeInfo>>Analyzer::analyzeLambda(
     const LambdaExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
     auto LambdaEnv = std::make_shared<Environment>(env); //let add = \x : int64 -> x + 1 i add(5)
 
-    std::vector<sPtr<TypeInfo>> paramTypes;
-    for(const auto& param : e.params){
-
-        if(!param.type){
-            errors.push_back(makeError(
-                "lambda parameter \'" + param.name + 
-                "\' requires a type annotation, for exapmle \\" + param.name + ": int64 -> ...", param.pos));
-            return std::nullopt;
-        }
-
-        auto paramType = resolveType(**param.type, {}, errors);
-        if(!paramType) return std::nullopt; //не можем построит тип лямбды
-
-        paramTypes.push_back(*paramType);
-        if(!LambdaEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos})){
-            errors.push_back(makeError(
-                "parameter '" + param.name + "' is already declared", param.pos));
-            return std::nullopt;
-        }
-    }
+    auto paramTypes = resolveLambdaParams(e, LambdaEnv, errors);
+    if(!paramTypes) return std::nullopt;
 
     auto bodyType = analyzeExpr(*e.body, LambdaEnv, errors);
-    if(!bodyType) return std::nullopt; //не можем определить, что возвращает
+    if(!bodyType) return std::nullopt;
 
-    //идем справа налево, что получили, что возвратили
-    sPtr<TypeInfo> funcType = *bodyType;
-    //так как лямбда это функция, то ее тип должен быть FunctionType
-    for(int i = static_cast<int>(paramTypes.size()) - 1; i >= 0; i--){
-        funcType = makeFunction(paramTypes[i], funcType); //первый проход там bodyType
-    }
-
-    return funcType; // -> ... -> ... -> ......
+    return buildLambdaType(*paramTypes, *bodyType);
 }
+
+std::optional<std::vector<sPtr<TypeInfo>>> Analyzer::resolveLambdaParams(const LambdaExpr& e, sPtr<Environment> lambdaEnv, 
+    std::vector<SemanticError>& errors){ 
+        
+        std::vector<sPtr<TypeInfo>> paramTypes;
+        for(const auto& param : e.params){
+
+            if(!param.type){
+                errors.push_back(makeError(
+                    "lambda parameter \'" + param.name + 
+                    "\' requires a type annotation, for exapmle \\" + param.name + ": int64 -> ...", param.pos));
+                return std::nullopt;
+            }
+
+            auto paramType = resolveType(**param.type, {}, errors);
+            if(!paramType) return std::nullopt; //не можем построит тип лямбды
+
+            paramTypes.push_back(*paramType);
+            if(!lambdaEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos})){
+                errors.push_back(makeError(
+                    "parameter '" + param.name + "' is already declared", param.pos));
+                return std::nullopt;
+            }
+        }
+
+        return paramTypes;
+}
+
 
 
 //analyzyConstructor
@@ -1199,45 +1256,54 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
     }
 
     //количество аргументов в конструкторе
-    if(e.args.size() != ctorInfo->fieldTypes.size()){
-        errors.push_back(makeError(
-            "' constructor " + e.name + "expects " + 
-            std::to_string(ctorInfo -> fieldTypes.size()) + "argument(s), got " + 
-            std::to_string(e.args.size()), e.pos));
-
-        return std::nullopt;
-    }
+    if(!checkConstructorArgCount(e, *ctorInfo, errors)) return std::nullopt;
     
     //если ADT параметизирован, то есть присутсвует Generic, пока пропускаем это более сложная реализация
     auto dataInfo = m_registry.lookupData(ctorInfo->dataName);
     bool isGeneric = dataInfo && !dataInfo -> typeParams.empty();
 
     if(isGeneric){
-
-        for(int i = 0; i < e.args.size(); i++){
-            analyzeExpr(*e.args[i], env, errors); //тип определить не может, проверка на корректность аргументов выражения 
+        for(int i = 0; i < e.args.size(); i++){  //тип определить не может, проверка на корректность аргументов выражения
+            analyzeExpr(*e.args[i], env, errors); //Some(1 + "hello")
         }
-
-        return makeSimple(ctorInfo -> dataName);
-
     } else {
+        checkConstructorArgs(e, *ctorInfo, env, errors);
+    }
+
+    return makeSimple(ctorInfo->dataName);
+}
+
+void Analyzer::checkConstructorArgs(const ConstructorExpr& e, const ConstructorInfo& ctorInfo, sPtr<Environment> env, 
+    std::vector<SemanticError>& errors){
+
         for(std::size_t i = 0; i < e.args.size(); i++){
             auto argType = analyzeExpr(*e.args[i], env, errors);
-            if(!argType) continue; 
+            if(!argType) continue;
 
-            if(!typesCompatible(**argType, *ctorInfo->fieldTypes[i])){
+            if(!typesCompatible(**argType, *ctorInfo.fieldTypes[i])){
                 errors.push_back(makeError(
                     "constructor '" + e.name + "' argument " + 
                     std::to_string(i + 1) + " has type '" + 
                     (*argType)->toString() + "', expected '" + 
-                    ctorInfo->fieldTypes[i] -> toString() + "'", e.pos));
+                    ctorInfo.fieldTypes[i] -> toString() + "'", e.pos));
             }
         }
-
-        return makeSimple(ctorInfo -> dataName);
-    }
 }
 
+bool Analyzer::checkConstructorArgCount(const ConstructorExpr& e, const ConstructorInfo& ctorInfo,
+    std::vector<SemanticError>& errors){
+
+        if(e.args.size() == ctorInfo.fieldTypes.size()) return true;
+        errors.push_back(makeError(
+            "' constructor " + e.name + "expects " + 
+            std::to_string(ctorInfo.fieldTypes.size()) + "argument(s), got " + 
+            std::to_string(e.args.size()), e.pos));
+        return false;
+}
+
+
+
+//Tuple and List
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeTuple(
     const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){ 
 
@@ -1282,103 +1348,44 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
 }
 
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//анализ pattern`s
+
+//совместим ли паттерн с типом x
 bool Analyzer::analyzePattern(
     const PatternNode& pattern, sPtr<TypeInfo> expectedType, sPtr<Environment> env, std::vector<SemanticError>& errors){
     //expected type - match x, пусть x заранее в функции определен как x : int64, тогда ожидаемый тип int64    
 
     //wildcard
-    if(std::get_if<WildcardPatternNode>(&pattern.var)){
-        return true;
-    }
+    if(std::get_if<WildcardPatternNode>(&pattern.var)) return analyzeWildcardPattern();
 
     //literal
     if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){
-        sPtr<TypeInfo> litType;
-
-        switch(p->kind){
-            case LiteralPatternNode::Kind::Int: litType = makeBuiltin("int64"); break;
-            case LiteralPatternNode::Kind::Real: litType = makeBuiltin("float64"); break;
-            case LiteralPatternNode::Kind::String: litType = makeBuiltin("string"); break;
-            case LiteralPatternNode::Kind::Bool: litType = makeBuiltin("bool"); break;
-        }
-
-        if(!typesCompatible(*expectedType, *litType)){
-            errors.push_back(makeError(
-                "literal pattern type '" + litType->toString() + 
-                "' does not match target type '" + expectedType->toString() + "'", p->pos));
-            return false;
-        }
-
-        return true;
+        return analyzeLiteralPattern(*p, expectedType, errors);
     }
 
-    //одно имя - одно связывание 
 
+    //одно имя - одно связывание 
     /* 
+
     *match(1, 2){
         *(x, x) -> x + 1; //возникает неоднозначность, функц. языки - одно имя в паттерне
     *}
     */
 
-    //для рассмотрения имен рекурсивно в кортеже и списке
+    //для рассмотрения имен рекурсивно в кортеже и списке - xs => x : other
     if(const auto* p = std::get_if<NamePatternNode>(&pattern.var)){
-        if(env -> lookupLocal(p->name)){
-            errors.push_back(makeError(
-                "variable '" + p->name + "' is already bound in this pattern", p->pos));
-            return false;
-        }
-
-        env->define(p->name, Symbol{p->name, expectedType, false, p->pos});
-        return true;
+        return analyzeNamePattern(*p, expectedType, env, errors);
     }
 
     if(const auto* p = std::get_if<TuplePatternNode>(&pattern.var)){
-        auto* tupleType = std::get_if<TupleType>(&expectedType->var); //указатель на ожидаемый тип
-
-        if(!tupleType){
-            errors.push_back(makeError(
-                "tuple pattern does not match '" + expectedType->toString() + 
-                "'", p->pos));
-            return false;
-        }
-
-        if(p->elems.size() != tupleType->elems.size()){
-            errors.push_back(makeError(
-                "tuple pattern has " + std::to_string(p->elems.size()) + 
-                " element(s), but type has " + std::to_string(tupleType->elems.size()), p->pos));
-            return false;
-        }
-
-        bool ok = true;
-        for(std::size_t i = 0; i < p->elems.size(); i++){
-            if(!analyzePattern(*p->elems[i], tupleType->elems[i], env, errors)){
-                ok = false;
-            }
-        }
-
-        return ok;
+        return analyzeTuplePattern(*p, expectedType, env, errors);
     }
 
-    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){ 
-        auto listType = std::get_if<ListType>(&expectedType->var);
-
-        if(!listType){
-            errors.push_back(makeError(
-                "list pattern does not match '" + expectedType->toString() + 
-                "'", p->pos));
-            return false;
-        }
-
-        bool ok = true;
-        for(std::size_t i = 0; i < p->elems.size(); i++){
-            if(!analyzePattern(*p->elems[i], listType->elem, env, errors)){
-                ok = false;
-            }
-        }
-
-        return ok;
+    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){
+        return analyzeListPattern(*p, expectedType, env, errors);
     }
-
 
     //cons x : xs 
 
@@ -1389,69 +1396,182 @@ bool Analyzer::analyzePattern(
     */
 
     if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
-        auto* listType = std::get_if<ListType>(&expectedType->var);
-        if(!listType){
-            errors.push_back(makeError(
-                "cons pattern does not match '" + expectedType->toString() + 
-                "'", p->pos));
-            return false;
-        }
-
-        bool ok = analyzePattern(*p->head, listType->elem, env, errors); //тип элемента списка
-        ok = analyzePattern(*p->tail, expectedType, env, errors) && ok;
-        return ok;
+        return analyzeConsPattern(*p, expectedType, env, errors);
     }
 
-    //обработка конструктора ADT | Some(x), None, Circle(r)
-    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var)){
-        auto ctorInfo = m_registry.lookupConstructor(p->name); //существует вообще? //ctorInfo - общий вид
-        if(!ctorInfo){
-            errors.push_back(makeError(  //несуществующий конструктор в паттерне
-                "unknown constructor '" + p->name + "'", p->pos));
-            return false;
-        }
-
-        auto resolvedExpected = m_registry.resolveAlias(expectedType); //type MyShape = Shape
-
-        if(const auto* st = std::get_if<SimpleType>(&resolvedExpected->var)){ //принадлежность нужному типу
-            if(st->name != ctorInfo->dataName){
-                errors.push_back(makeError(
-                    "constructor '" + p->name + "' belongs to type '" + 
-                    ctorInfo->dataName + "' but target has type '" + 
-                    expectedType -> toString() + "'", p->pos));
-                return false;
-            }
-        } else if (const auto* gt = std::get_if<GenericType>(&resolvedExpected->var)){
-            if(gt->name != ctorInfo->dataName){
-                errors.push_back(makeError(
-                    "constructor '" + p->name + "' belongs to type '" + 
-                    ctorInfo->dataName + "' but target has type '" + 
-                    expectedType -> toString() + "'", p->pos));
-                return false;
-            }
-        }
-
-        if(p->args.size() != ctorInfo->fieldTypes.size()){
-            errors.push_back(makeError(
-                "constructor '" + p->name + "' has " + 
-                std::to_string(ctorInfo->fieldTypes.size()) + 
-                " field(s) but pattern has" + std::to_string(p->args.size()), p->pos));
-                return false;
-        }
-
-        //Рекурсивно проверяем аргументы
-        bool ok = true;
-        for(std::size_t i = 0; i < p->args.size(); i++){
-            if(!analyzePattern(*p->args[i], ctorInfo->fieldTypes[i], env, errors)){
-                ok = false;
-            }
-        }
-        return ok;
-    }
+    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var))
+    return analyzeConstructorPattern(*p, expectedType, env, errors);
 
     __builtin_unreachable(); //все случаи это variant из фиксированного набора типов - один всегда есть
 }
 
 
+
+bool Analyzer::analyzeWildcardPattern(){
+    return true;
+}
+
+bool Analyzer::analyzeLiteralPattern(const LiteralPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+    std::vector<SemanticError>& errors){
+
+        sPtr<TypeInfo> litType;
+
+        switch(p.kind){
+            case LiteralPatternNode::Kind::Int: litType = makeBuiltin("int64"); break;
+            case LiteralPatternNode::Kind::Real: litType = makeBuiltin("float64"); break;
+            case LiteralPatternNode::Kind::String: litType = makeBuiltin("string"); break;
+            case LiteralPatternNode::Kind::Bool: litType = makeBuiltin("bool"); break;
+        }
+
+        if(!typesCompatible(*expectedType, *litType)){
+            errors.push_back(makeError(
+                "literal pattern type '" + litType->toString() + 
+                "' does not match target type '" + expectedType->toString() + "'", p.pos));
+            return false;
+        }
+
+        return true;
+}
+
+bool Analyzer::analyzeNamePattern(const NamePatternNode& p, const sPtr<TypeInfo>& expectedType, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        if(env -> lookupLocal(p.name)){
+            errors.push_back(makeError(
+                "variable '" + p.name + "' is already bound in this pattern", p.pos));
+            return false;
+        }
+
+        env->define(p.name, Symbol{p.name, expectedType, false, p.pos});
+        return true;
+}
+
+bool Analyzer::analyzeTuplePattern(const TuplePatternNode& p, const sPtr<TypeInfo>& expectedType, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        auto* tupleType = std::get_if<TupleType>(&expectedType->var);
+        if(!tupleType){
+            errors.push_back(makeError(
+                "tuple pattern does not match '" + expectedType->toString() + 
+                "'", p.pos));
+            return false;
+        }
+
+        if(p.elems.size() != tupleType->elems.size()){
+            errors.push_back(makeError(
+                "tuple pattern has " + std::to_string(p.elems.size()) + 
+                " element(s), but type has " + std::to_string(tupleType->elems.size()), p.pos));
+            return false;
+        }
+
+        bool ok = true;
+        for(std::size_t i = 0; i < p.elems.size(); i++){
+            if(!analyzePattern(*p.elems[i], tupleType->elems[i], env, errors)){
+                ok = false;
+            }
+        }
+
+        return ok;
+}
+
+bool Analyzer::analyzeListPattern(const ListPatternNode& p, const sPtr<TypeInfo>& expectedType,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+        auto listType = std::get_if<ListType>(&expectedType->var);
+
+        if(!listType){
+            errors.push_back(makeError(
+                "list pattern does not match '" + expectedType->toString() + 
+                "'", p.pos));
+            return false;
+        }
+
+        bool ok = true; //получаем все ошибки
+        for(std::size_t i = 0; i < p.elems.size(); i++){
+            if(!analyzePattern(*p.elems[i], listType->elem, env, errors)){
+                ok = false;
+            }
+        }
+
+        return ok;
+}
+
+bool Analyzer::analyzeConsPattern(const ConsPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        auto* listType = std::get_if<ListType>(&expectedType->var);
+        if(!listType){
+            errors.push_back(makeError(
+                "cons pattern does not match '" + expectedType->toString() + 
+                "'", p.pos));
+            return false;
+        }
+
+        //в перспективе x : y : rest
+        bool ok = analyzePattern(*p.head, listType->elem, env, errors); //тип элемента списка
+        ok = analyzePattern(*p.tail, expectedType, env, errors) && ok;
+        return ok;
+}
+
+bool Analyzer::analyzeConstructorPattern(const ConstructorPatternNode& p, const sPtr<TypeInfo>& expectedType, 
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        auto ctorInfo = m_registry.lookupConstructor(p.name); //существует вообще? //ctorInfo - общий вид
+        if(!ctorInfo){
+            errors.push_back(makeError(  //несуществующий конструктор в паттерне
+                "unknown constructor '" + p.name + "'", p.pos));
+            return false;
+        }
+
+        if(!checkConstructorOwnership(p, *ctorInfo, expectedType, errors)) return false;
+
+        if(!checkConstructorPatternArgCount(p, *ctorInfo, errors)) return false;
+
+        //Рекурсивно проверяем аргументы
+        bool ok = true;
+        for(std::size_t i = 0; i < p.args.size(); i++){
+            if(!analyzePattern(*p.args[i], ctorInfo->fieldTypes[i], env, errors)){
+                ok = false;
+            }
+        }
+
+        return ok;
+}
+
+//вспомогательные конструктора
+bool Analyzer::checkConstructorOwnership(const ConstructorPatternNode& p, const ConstructorInfo& ctorInfo,
+    const sPtr<TypeInfo>& expectedType, std::vector<SemanticError>& errors){
+
+        auto resolvedExpected = m_registry.resolveAlias(expectedType); //type MyShape = Shape
+        std::string typeName;
+        
+        if(const auto* st = std::get_if<SimpleType>(&resolvedExpected->var)) //принадлежность нужному типу
+            typeName = st->name;
+        else if(const auto* gt = std::get_if<GenericType>(&resolvedExpected->var))
+            typeName = gt->name;
+        else
+            return true;
+
+        if(typeName != ctorInfo.dataName){
+            errors.push_back(makeError(
+                "constructor '" + p.name + "' belongs to type '" +
+                ctorInfo.dataName + "' but target has type '" +
+                expectedType->toString() + "'", p.pos));
+            return false;
+        }
+        return true;
+
+}
+
+bool Analyzer::checkConstructorPatternArgCount(const ConstructorPatternNode& p, const ConstructorInfo& ctorInfo,
+    std::vector<SemanticError>& errors){
+
+        if(p.args.size() == ctorInfo.fieldTypes.size()) return true;
+
+        errors.push_back(makeError(
+            "constructor '" + p.name + "' has " + 
+            std::to_string(ctorInfo.fieldTypes.size()) + 
+            " field(s) but pattern has" + std::to_string(p.args.size()), p.pos));
+        return false;
+}
 
 }
