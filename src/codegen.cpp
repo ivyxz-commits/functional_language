@@ -38,6 +38,9 @@ std::string CodeGenerator::generate(const Program& prog){
     m_text.str(""); m_data.str(""); m_bss.str(""); //внутренняя строка пустая
 
     m_data << "section .data\n";
+    m_data << "__div_zero_len: dq 16\n"; //метка длины 8 байт, значение 16 {length, data[]}
+    m_data << "__div_zero_dat: db `division by zero`, 0\n"; //строка + нулевой байт
+
     m_bss << "section .bss\n";
     m_bss << "    __read_buf: resb 4096\n"; //read_str - input() - пустая память, не имеет значения - ОС выделяет память при запуске
     m_bss << "    __print_int_buf: resb 24\n"; //буфер для печати целого числа Int - 19 чисел
@@ -586,7 +589,14 @@ void CodeGenerator::genFloatOp(BinaryOp op){
         case BinaryOp::Add: emit("addsd xmm0, xmm1"); break;
         case BinaryOp::Sub: emit("subsd xmm0, xmm1"); break;
         case BinaryOp::Mul: emit("mulsd xmm0, xmm1"); break;
-        case BinaryOp::Div: emit("divsd xmm0, xmm1"); break;
+        case BinaryOp::Div: 
+            emit("xorpd xmm2, xmm2");
+            emit("uconisd xmm1, xmm2");
+            emit("jne .div_ok_" + std::to_string(m_labelCnt));
+            emit("call __lang_panic");
+            emit("mov rdi, __div_zero_len");
+            emitLabel(".div_ok_" + std::to_string(m_labelCnt++));
+            emit("divsd xmm0, xmm1"); break;
         case BinaryOp::Eq:
             emit("ucomisd xmm0, xmm1");
             emit("sete al");
@@ -628,10 +638,20 @@ void CodeGenerator::genIntOp(BinaryOp op){
         case BinaryOp::Sub: emit("sub rax, rcx"); break;
         case BinaryOp::Mul: emit("imul rax, rcx"); break;
         case BinaryOp::Div:
+            emit("cmp rcx, 0"); //проверка деления на 0
+            emit("jne. div_ok_" + std::to_string(m_labelCnt));
+            emit("mov rdi, __div_zero_len");
+            emit("call __lang_panic");
+            emitLabel(".div_ok_" + std::to_string(m_labelCnt++));
             emit("cqo");
             emit("idiv rcx"); //rax - частное
             break;
         case BinaryOp::Mod:
+        emit("cmp rcx, 0"); //проверка деления на 0
+            emit("jne. div_ok_" + std::to_string(m_labelCnt));
+            emit("mov rdi, __div_zero_len");
+            emit("call __lang_panic");
+            emitLabel(".div_ok_" + std::to_string(m_labelCnt++));
             emit("cqo");
             emit("idiv rcx");
             emit("mov rax, rdx");
@@ -1390,7 +1410,6 @@ void CodeGenerator::scanExpr(const ExprNode& expr, const std::vector<std::string
 }
 
 
-
 //проблема такая же как в genFuncDecl - нужен временный буфер чтобы узнать stacksize
 //асемблерный код для тела лямбды | rdi - указатель на захваченные переменные - rsi, rdi, rcx, ... явные параметры
 std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
@@ -1460,7 +1479,6 @@ void CodeGenerator::genLambdaParams(const LambdaExpr& e, FuncContext& ctx){
         emit("mov [rbp" + std::to_string(offset) + "], rax"); //в стек нашей функции
     }
 }
-
 
 
 //для замыкания нужен сам код и env - в куче объект замыкания {code ptr, env_ptr}
