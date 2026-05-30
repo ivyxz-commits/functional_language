@@ -1,0 +1,9 @@
+//14. Найти наименьшее общее кратное двух заданных натуральных чисел. (leasst common multiple)
+
+fn gcd(a: int64, b: int64) -> int64 = 
+    if b == 0 then a else gcd(b, a % b) //a - делитель
+
+fn lcm(a: int64, b: int64) -> int64 = 
+    a / gcd(a, b) * b
+
+fn main() -> int64 = print(lcm(15, 60))

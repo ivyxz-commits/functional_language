@@ -116,10 +116,8 @@ private:
 
     //expressions - rax
     void genExpr(const ExprNode& expr, FuncContext& ctx);
-    void genLiteral(const LiteralExpr& e, FuncContext& ctx);
     void genIdent(const IdentExpr& e, FuncContext& ctx);
     void genUnary(const UnaryExpr& e, FuncContext& ctx);
-    void genCall(const CallExpr& e, FuncContext& ctx);
     void genIf(const IfExpr& e, FuncContext& ctx);
     void genMatch(const MatchExpr& e, FuncContext& ctx);
     void genLambda(const LambdaExpr& e, FuncContext& ctx);

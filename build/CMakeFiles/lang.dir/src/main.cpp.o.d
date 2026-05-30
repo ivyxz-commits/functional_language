@@ -165,7 +165,7 @@ CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp \
  /usr/include/c++/13/bits/stl_bvector.h \
  /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/optional \
  /usr/include/c++/13/bits/enable_special_members.h \
- /usr/include/c++/13/expected /home/ivan_su/project/src/tokens.hpp \
+ /usr/include/c++/13/expected /home/ivan_su/project/src/lexer/tokens.hpp \
  /usr/include/c++/13/format /usr/include/c++/13/array \
  /usr/include/c++/13/charconv /usr/include/c++/13/limits \
  /usr/include/c++/13/locale \
@@ -177,7 +177,7 @@ CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp \
  /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
  /usr/include/c++/13/bits/ranges_algobase.h \
  /home/ivan_su/project/src/parser/parser.hpp \
- /home/ivan_su/project/src/ast.hpp /usr/include/c++/13/memory \
+ /home/ivan_su/project/src/parser/ast.hpp /usr/include/c++/13/memory \
  /usr/include/c++/13/bits/stl_tempbuf.h \
  /usr/include/c++/13/bits/stl_raw_storage_iter.h \
  /usr/include/c++/13/bits/align.h \
@@ -219,10 +219,11 @@ CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp \
  /usr/include/c++/13/bits/ranges_uninitialized.h \
  /usr/include/c++/13/pstl/glue_memory_defs.h \
  /usr/include/c++/13/pstl/execution_defs.h \
- /home/ivan_su/project/src/semantic.hpp /usr/include/c++/13/unordered_map \
+ /home/ivan_su/project/src/semantic/semantic.hpp \
+ /usr/include/c++/13/unordered_map \
  /usr/include/c++/13/bits/unordered_map.h \
  /usr/include/c++/13/bits/hashtable.h \
  /usr/include/c++/13/bits/hashtable_policy.h \
  /usr/include/c++/13/bits/node_handle.h \
  /usr/include/c++/13/bits/erase_if.h \
- /home/ivan_su/project/src/codegen.hpp
+ /home/ivan_su/project/src/codegen/codegen.hpp

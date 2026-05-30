@@ -142,29 +142,81 @@ lang/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/build
 .PHONY : lang/fast
 
-src/codegen.o: src/codegen.cpp.o
-.PHONY : src/codegen.o
+#=============================================================================
+# Target rules for targets named build
+
+# Build rule for target.
+build: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build
+.PHONY : build
+
+# fast build rule for target.
+build/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/build.dir/build.make CMakeFiles/build.dir/build
+.PHONY : build/fast
+
+#=============================================================================
+# Target rules for targets named run
+
+# Build rule for target.
+run: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 run
+.PHONY : run
+
+# fast build rule for target.
+run/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/run.dir/build.make CMakeFiles/run.dir/build
+.PHONY : run/fast
+
+#=============================================================================
+# Target rules for targets named debug
+
+# Build rule for target.
+debug: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 debug
+.PHONY : debug
+
+# fast build rule for target.
+debug/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/debug.dir/build.make CMakeFiles/debug.dir/build
+.PHONY : debug/fast
+
+#=============================================================================
+# Target rules for targets named clean_all
+
+# Build rule for target.
+clean_all: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 clean_all
+.PHONY : clean_all
+
+# fast build rule for target.
+clean_all/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/clean_all.dir/build.make CMakeFiles/clean_all.dir/build
+.PHONY : clean_all/fast
+
+src/codegen/codegen.o: src/codegen/codegen.cpp.o
+.PHONY : src/codegen/codegen.o
 
 # target to build an object file
-src/codegen.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen.cpp.o
-.PHONY : src/codegen.cpp.o
+src/codegen/codegen.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen/codegen.cpp.o
+.PHONY : src/codegen/codegen.cpp.o
 
-src/codegen.i: src/codegen.cpp.i
-.PHONY : src/codegen.i
+src/codegen/codegen.i: src/codegen/codegen.cpp.i
+.PHONY : src/codegen/codegen.i
 
 # target to preprocess a source file
-src/codegen.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen.cpp.i
-.PHONY : src/codegen.cpp.i
+src/codegen/codegen.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen/codegen.cpp.i
+.PHONY : src/codegen/codegen.cpp.i
 
-src/codegen.s: src/codegen.cpp.s
-.PHONY : src/codegen.s
+src/codegen/codegen.s: src/codegen/codegen.cpp.s
+.PHONY : src/codegen/codegen.s
 
 # target to generate assembly for a file
-src/codegen.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen.cpp.s
-.PHONY : src/codegen.cpp.s
+src/codegen/codegen.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen/codegen.cpp.s
+.PHONY : src/codegen/codegen.cpp.s
 
 src/lexer/lexer.o: src/lexer/lexer.cpp.o
 .PHONY : src/lexer/lexer.o
@@ -334,29 +386,29 @@ src/parser/parser_types.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/parser/parser_types.cpp.s
 .PHONY : src/parser/parser_types.cpp.s
 
-src/semantic.o: src/semantic.cpp.o
-.PHONY : src/semantic.o
+src/semantic/semantic.o: src/semantic/semantic.cpp.o
+.PHONY : src/semantic/semantic.o
 
 # target to build an object file
-src/semantic.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic.cpp.o
-.PHONY : src/semantic.cpp.o
+src/semantic/semantic.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic/semantic.cpp.o
+.PHONY : src/semantic/semantic.cpp.o
 
-src/semantic.i: src/semantic.cpp.i
-.PHONY : src/semantic.i
+src/semantic/semantic.i: src/semantic/semantic.cpp.i
+.PHONY : src/semantic/semantic.i
 
 # target to preprocess a source file
-src/semantic.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic.cpp.i
-.PHONY : src/semantic.cpp.i
+src/semantic/semantic.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic/semantic.cpp.i
+.PHONY : src/semantic/semantic.cpp.i
 
-src/semantic.s: src/semantic.cpp.s
-.PHONY : src/semantic.s
+src/semantic/semantic.s: src/semantic/semantic.cpp.s
+.PHONY : src/semantic/semantic.s
 
 # target to generate assembly for a file
-src/semantic.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic.cpp.s
-.PHONY : src/semantic.cpp.s
+src/semantic/semantic.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/semantic/semantic.cpp.s
+.PHONY : src/semantic/semantic.cpp.s
 
 # Help Target
 help:
@@ -366,11 +418,15 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... build"
+	@echo "... clean_all"
+	@echo "... debug"
+	@echo "... run"
 	@echo "... runtime_files"
 	@echo "... lang"
-	@echo "... src/codegen.o"
-	@echo "... src/codegen.i"
-	@echo "... src/codegen.s"
+	@echo "... src/codegen/codegen.o"
+	@echo "... src/codegen/codegen.i"
+	@echo "... src/codegen/codegen.s"
 	@echo "... src/lexer/lexer.o"
 	@echo "... src/lexer/lexer.i"
 	@echo "... src/lexer/lexer.s"
@@ -392,9 +448,9 @@ help:
 	@echo "... src/parser/parser_types.o"
 	@echo "... src/parser/parser_types.i"
 	@echo "... src/parser/parser_types.s"
-	@echo "... src/semantic.o"
-	@echo "... src/semantic.i"
-	@echo "... src/semantic.s"
+	@echo "... src/semantic/semantic.o"
+	@echo "... src/semantic/semantic.i"
+	@echo "... src/semantic/semantic.s"
 .PHONY : help
 
 

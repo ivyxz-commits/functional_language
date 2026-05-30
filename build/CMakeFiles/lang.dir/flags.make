@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/home/ivan_su/project/src -I/home/ivan_su/project/src/lexer -I/home/ivan_su/project/src/parser
+CXX_INCLUDES = -I/home/ivan_su/project/src -I/home/ivan_su/project/src/lexer -I/home/ivan_su/project/src/parser -I/home/ivan_su/project/src/semantic -I/home/ivan_su/project/src/codegen
 
-CXX_FLAGS = -std=gnu++23
+CXX_FLAGS = -std=gnu++23 -Wall -Wextra
 

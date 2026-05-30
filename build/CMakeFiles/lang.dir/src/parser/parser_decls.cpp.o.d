@@ -1,7 +1,7 @@
 CMakeFiles/lang.dir/src/parser/parser_decls.cpp.o: \
  /home/ivan_su/project/src/parser/parser_decls.cpp \
  /usr/include/stdc-predef.h /home/ivan_su/project/src/parser/parser.hpp \
- /home/ivan_su/project/src/ast.hpp /usr/include/c++/13/memory \
+ /home/ivan_su/project/src/parser/ast.hpp /usr/include/c++/13/memory \
  /usr/include/c++/13/bits/memoryfwd.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/os_defines.h \
@@ -201,4 +201,4 @@ CMakeFiles/lang.dir/src/parser/parser_decls.cpp.o: \
  /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/optional \
  /usr/include/c++/13/bits/enable_special_members.h \
  /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
- /home/ivan_su/project/src/tokens.hpp /usr/include/c++/13/expected
+ /home/ivan_su/project/src/lexer/tokens.hpp /usr/include/c++/13/expected

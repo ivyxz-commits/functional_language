@@ -1,0 +1,20 @@
+//58. Найдите наибольшее значение отношения трёхзначного числа к сумме его цифр.
+
+//сумма цифр числа
+fn digitSum(n: int64) -> int64 = 
+    let a = n/100 in
+    let b = (n / 10) % 10 in
+    let c = n % 10 in
+    a + b + c
+
+fn solve(n: int64, bestN: int64, bestNum: int64) -> int64 = 
+    if n > 999 then bestN
+    else 
+        let s = digitSum(n) in
+        let num = n / s in
+        if num > bestNum
+        then solve(n + 1, n, num)
+        else solve(n + 1, bestN, bestNum)
+
+
+fn main() -> int64 = print(solve(100, 100, digitSum(100)))

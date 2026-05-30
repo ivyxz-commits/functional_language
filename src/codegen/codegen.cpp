@@ -360,6 +360,16 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     genFuncParams(fn, ctx);
     genExpr(*fn.body, ctx); //выражения, результат в rax
 
+    //print() in main
+    if(fn.name == "main"){
+        auto it = m_exprTypes.find(fn.body.get());
+        if(it != m_exprTypes.end()){
+            if(const auto* bt = std::get_if<BuiltinType>(&it->second->var)){
+                if(bt->name == "unit") emit("xor rax, rax");
+            }
+        }
+    }
+
     emit("mov rsp, rbp");
     emit("pop rbp");
     emit("ret");
@@ -643,7 +653,7 @@ void CodeGenerator::genIntOp(BinaryOp op){
         case BinaryOp::Mul: emit("imul rax, rcx"); break;
         case BinaryOp::Div:
             emit("cmp rcx, 0"); //проверка деления на 0
-            emit("jne. div_ok_" + std::to_string(m_labelCnt));
+            emit("jne .div_ok_" + std::to_string(m_labelCnt));
             emit("mov rdi, __div_zero_len");
             emit("call __lang_panic");
             emitLabel(".div_ok_" + std::to_string(m_labelCnt++));
@@ -652,7 +662,7 @@ void CodeGenerator::genIntOp(BinaryOp op){
             break;
         case BinaryOp::Mod:
         emit("cmp rcx, 0"); //проверка деления на 0
-            emit("jne. div_ok_" + std::to_string(m_labelCnt));
+            emit("jne .div_ok_" + std::to_string(m_labelCnt));
             emit("mov rdi, __div_zero_len");
             emit("call __lang_panic");
             emitLabel(".div_ok_" + std::to_string(m_labelCnt++));

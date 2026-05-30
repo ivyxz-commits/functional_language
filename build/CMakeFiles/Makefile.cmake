@@ -42,4 +42,8 @@ set(CMAKE_MAKEFILE_PRODUCTS
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/runtime_files.dir/DependInfo.cmake"
   "CMakeFiles/lang.dir/DependInfo.cmake"
+  "CMakeFiles/build.dir/DependInfo.cmake"
+  "CMakeFiles/run.dir/DependInfo.cmake"
+  "CMakeFiles/debug.dir/DependInfo.cmake"
+  "CMakeFiles/clean_all.dir/DependInfo.cmake"
   )

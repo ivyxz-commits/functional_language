@@ -628,7 +628,7 @@ void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vec
 void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto funcEnv = std::make_shared<Environment>(env); 
 
-    //моя реализация не поддерживает fn smth[a](x: a) -> a = x - у меня функция не параметризована типом
+    //моя текущая реализация не поддерживает fn smth[a](x: a) -> a = x - у меня функция не параметризована типом
     //std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap - она соотвественно будет пустой
 
     for(const auto& param : fn.params){
@@ -658,7 +658,16 @@ void Analyzer::checkFuncBody(const FuncDecl& fn, sPtr<Environment> funcEnv, std:
     if(!bodyType) return;
 
     auto expectedType = resolveType(**fn.returnType, {}, errors);
-    if(expectedType && !typesCompatible(**bodyType, **expectedType)){
+    if(!expectedType) return;
+
+    //своеобразный способ обработки print - без let _ = print() in 0
+    if(fn.name == "main"){
+        if(const auto* bt = std::get_if<BuiltinType>(&(*bodyType)->var)){
+            if(bt -> name == "unit") return;
+        }
+    }
+
+    if(!typesCompatible(**bodyType, **expectedType)){
         errors.push_back(makeError(
             "function '" + fn.name + "'body type '" + 
             (*bodyType)->toString() + "'does not match declared return type '" + 

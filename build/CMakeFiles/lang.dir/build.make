@@ -167,33 +167,33 @@ CMakeFiles/lang.dir/src/parser/parser_types.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/parser/parser_types.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/parser/parser_types.cpp -o CMakeFiles/lang.dir/src/parser/parser_types.cpp.s
 
-CMakeFiles/lang.dir/src/semantic.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/semantic.cpp.o: /home/ivan_su/project/src/semantic.cpp
-CMakeFiles/lang.dir/src/semantic.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/lang.dir/src/semantic.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic.cpp.o -MF CMakeFiles/lang.dir/src/semantic.cpp.o.d -o CMakeFiles/lang.dir/src/semantic.cpp.o -c /home/ivan_su/project/src/semantic.cpp
+CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/semantic/semantic.cpp
+CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic.cpp.o -c /home/ivan_su/project/src/semantic/semantic.cpp
 
-CMakeFiles/lang.dir/src/semantic.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic.cpp > CMakeFiles/lang.dir/src/semantic.cpp.i
+CMakeFiles/lang.dir/src/semantic/semantic.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic.cpp > CMakeFiles/lang.dir/src/semantic/semantic.cpp.i
 
-CMakeFiles/lang.dir/src/semantic.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic.cpp -o CMakeFiles/lang.dir/src/semantic.cpp.s
+CMakeFiles/lang.dir/src/semantic/semantic.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic.cpp -o CMakeFiles/lang.dir/src/semantic/semantic.cpp.s
 
-CMakeFiles/lang.dir/src/codegen.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/codegen.cpp.o: /home/ivan_su/project/src/codegen.cpp
-CMakeFiles/lang.dir/src/codegen.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/lang.dir/src/codegen.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen.cpp.o -MF CMakeFiles/lang.dir/src/codegen.cpp.o.d -o CMakeFiles/lang.dir/src/codegen.cpp.o -c /home/ivan_su/project/src/codegen.cpp
+CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: /home/ivan_su/project/src/codegen/codegen.cpp
+CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen.cpp.o -c /home/ivan_su/project/src/codegen/codegen.cpp
 
-CMakeFiles/lang.dir/src/codegen.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen.cpp > CMakeFiles/lang.dir/src/codegen.cpp.i
+CMakeFiles/lang.dir/src/codegen/codegen.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen.cpp > CMakeFiles/lang.dir/src/codegen/codegen.cpp.i
 
-CMakeFiles/lang.dir/src/codegen.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen.cpp -o CMakeFiles/lang.dir/src/codegen.cpp.s
+CMakeFiles/lang.dir/src/codegen/codegen.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen.cpp -o CMakeFiles/lang.dir/src/codegen/codegen.cpp.s
 
 # Object files for target lang
 lang_OBJECTS = \
@@ -204,8 +204,8 @@ lang_OBJECTS = \
 "CMakeFiles/lang.dir/src/parser/parser_exprs.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_patterns.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_types.cpp.o" \
-"CMakeFiles/lang.dir/src/semantic.cpp.o" \
-"CMakeFiles/lang.dir/src/codegen.cpp.o"
+"CMakeFiles/lang.dir/src/semantic/semantic.cpp.o" \
+"CMakeFiles/lang.dir/src/codegen/codegen.cpp.o"
 
 # External object files for target lang
 lang_EXTERNAL_OBJECTS =
@@ -217,8 +217,8 @@ lang: CMakeFiles/lang.dir/src/parser/parser_decls.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_exprs.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_patterns.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_types.cpp.o
-lang: CMakeFiles/lang.dir/src/semantic.cpp.o
-lang: CMakeFiles/lang.dir/src/codegen.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic.cpp.o
+lang: CMakeFiles/lang.dir/src/codegen/codegen.cpp.o
 lang: CMakeFiles/lang.dir/build.make
 lang: runtime_functions.o
 lang: CMakeFiles/lang.dir/link.txt

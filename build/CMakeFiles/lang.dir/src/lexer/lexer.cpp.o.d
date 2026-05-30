@@ -129,7 +129,7 @@ CMakeFiles/lang.dir/src/lexer/lexer.cpp.o: \
  /usr/include/c++/13/bits/cxxabi_init_exception.h \
  /usr/include/c++/13/typeinfo /usr/include/c++/13/bits/nested_exception.h \
  /usr/include/c++/13/bits/enable_special_members.h \
- /usr/include/c++/13/expected /home/ivan_su/project/src/tokens.hpp \
+ /usr/include/c++/13/expected /home/ivan_su/project/src/lexer/tokens.hpp \
  /usr/include/c++/13/format /usr/include/c++/13/array \
  /usr/include/c++/13/charconv \
  /usr/include/x86_64-linux-gnu/c++/13/bits/error_constants.h \

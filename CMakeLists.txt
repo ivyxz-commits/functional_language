@@ -46,17 +46,17 @@ add_custom_target(build DEPENDS lang)
 
 # цель run
 add_custom_target(run
-    COMMAND ${CMAKE_BINARY_DIR}/lang ${CMAKE_SOURCE_DIR}/start.lang
-    COMMAND nasm -f elf64 ${CMAKE_SOURCE_DIR}/output/output.asm
-            -o ${CMAKE_SOURCE_DIR}/output/output.o
-    COMMAND gcc ${CMAKE_SOURCE_DIR}/output/output.o
-            ${CMAKE_BINARY_DIR}/runtime_functions.o
-            -o ${CMAKE_SOURCE_DIR}/output/program
-            -nostartfiles -no-pie
-    COMMAND ${CMAKE_SOURCE_DIR}/output/program
+    COMMAND ${CMAKE_BINARY_DIR}/lang ${CMAKE_SOURCE_DIR}/test.txt
+    COMMAND nasm -f elf64 ${CMAKE_BINARY_DIR}/output/output.asm
+        -o ${CMAKE_BINARY_DIR}/output/output.o
+    COMMAND gcc ${CMAKE_BINARY_DIR}/output/output.o
+        ${CMAKE_BINARY_DIR}/runtime_functions.o
+        -o ${CMAKE_BINARY_DIR}/output/program
+        -nostartfiles -no-pie
+    COMMAND ${CMAKE_BINARY_DIR}/output/program
     DEPENDS lang)
 
-# цель debug — с отладочными символами
+# цель debug - с отладочными символами
 add_custom_target(debug
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
