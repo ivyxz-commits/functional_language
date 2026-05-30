@@ -1,0 +1,4 @@
+./build/lang test.txt && \
+nasm -f elf64 output.asm -o output/output.o && \
+gcc output/output.o build/runtime_functions.o -o output/program -nostartfiles -no-pie && \
+./output/program
