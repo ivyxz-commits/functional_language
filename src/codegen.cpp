@@ -1,5 +1,12 @@
 #include "codegen.hpp"
 
+/*
+Логика линейная, каждая инструкция - один шаг генерации ассемблера
+Дробить на маленькие части нет смысла - контекст при чтении теряется
+и становится сложнее понять, что генерируется
+*/
+
+
 namespace Codegen {
 
 CodeGenerator::CodeGenerator(const TypeRegistry& registry, 
@@ -94,6 +101,7 @@ void CodeGenerator::emitDataLabel(const std::string& label){
 
 //ABI
 
+//аргументы в регистр
 const char* CodeGenerator::argReg(int i){
     static const char* regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     if(i < 6) return regs[i];
@@ -111,7 +119,7 @@ void CodeGenerator::emitAlloc(int size){
 }
 
 
-//вспомогательные функции isFloat, isString
+//вспомогательные функции isFloat, isString - в genPattern musthave
 bool CodeGenerator::isFloatExpr(const ExprNode& e) const{
     auto it = m_exprTypes.find(&e);
     if(it == m_exprTypes.end()) return false;
@@ -145,7 +153,7 @@ void CodeGenerator::emitRuntime(){
     emitExit();
 }
 
-//завершение программы с кодом возврата
+//завершение (нормальное) программы с кодом возврата
 void CodeGenerator::emitExit(){
     m_text << "__lang_exit:\n";
     m_text << "    mov rax, 60\n"; //ядро линукс уничтожает процесс и всю его память
@@ -254,7 +262,6 @@ void CodeGenerator::emitMalloc(){
     m_text << "    ret\n\n";
 }
 
-
 //вывод целого числа
 void CodeGenerator::emitPrintInt(){
     m_text << "__lang_print_int:\n";
@@ -308,11 +315,10 @@ void CodeGenerator::emitPrintInt(){
     m_text << "    ret\n\n";
 }
 
-//парсинг интов и реализацию вещественных чисел буду прописывать позже
-//плюсом еще добавим аллокатор для грамотной работы с памятью
 
 
-//начинаем реализовать основу, остальные отдельные моменты будут прописаны позже
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Declarations
 void CodeGenerator::genDecl(const DeclNode& decl){
     if(const auto* fn = std::get_if<FuncDecl>(&decl.var)){
@@ -324,11 +330,14 @@ void CodeGenerator::genDecl(const DeclNode& decl){
     //TypeAliasDecl и DataDecl - типы и кода не генерируют
 }
 
+
+
 void CodeGenerator::genModuleDecl(const ModuleDecl& mod){
     for(const auto& decl : mod.decls){ //объявление может быть и сам модуль
         genDecl(*decl);
     }
 }
+
 
 
 //нужен точный размер стека - std::swap - based on move semantics //по факту один умный проход
@@ -345,20 +354,7 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     std::swap(m_text, bodyStream); //m_text теперь пустой, а в bodyStream уже сохраняли стек и написали имя функции
     //пишем все в m_text
 
-    for(int i = 0; i < fn.params.size() && i < 6; i++){
-        int off = ctx.allocLocal(fn.params[i].name); //nextOffset -=8
-        emit("mov [rbp" + std::to_string(off) + "], " + std::string(argReg(i))); //вызывающая функция позаботиться
-    }
-
-    for(int i = 6; i < fn.params.size(); i++){
-        int stackArgOffset = 16 + (i - 6) * 8;
-
-        int off = ctx.allocLocal(fn.params[i].name);
-        emit("mov rax, [rbp" + std::to_string(stackArgOffset) + "]");
-
-        emit("mov [rbp" + std::to_string(off) + "], rax");
-    }
-
+    genFuncParams(fn, ctx);
     genExpr(*fn.body, ctx); //выражения, результат в rax
 
     emit("mov rsp, rbp");
@@ -391,8 +387,25 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     m_text << "\n";
 }
 
+//вспомогательная
+void CodeGenerator::genFuncParams(const FuncDecl& fn, FuncContext& ctx){
+    for(std::size_t i = 0; i < fn.params.size() && i < 6; i++){
+        int off = ctx.allocLocal(fn.params[i].name); //nextOffset -=8
+        emit("mov [rbp" + std::to_string(off) + "], " + std::string(argReg(i))); //вызывающая функция позаботиться
+    }
+
+    for(std::size_t i = 6; i < fn.params.size(); i++){
+        int stackArgOffset = 16 + (i - 6) * 8;
+
+        int off = ctx.allocLocal(fn.params[i].name);
+        emit("mov rax, [rbp" + std::to_string(stackArgOffset) + "]");
+
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+    }
+}
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //expressions
 void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
 
@@ -449,6 +462,7 @@ void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
     }
 }
 
+
 //Ident
 void CodeGenerator::genIdent(const IdentExpr& e, FuncContext& ctx){
     auto off = ctx.findLocal(e.name); //Локальные переменные на стеке;
@@ -467,44 +481,17 @@ void CodeGenerator::genIdent(const IdentExpr& e, FuncContext& ctx){
     //встроенных функций нет, они будут в genCall()
 }
 
+
 //Literals
 void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
-    if(const auto* v = std::get_if<long long>(&e.value)){
-        emit("mov rax, " + std::to_string(*v));
-    }
-
-    //вещественное число обработаем позже
-    //будем представлять наши вещественные числа как последовательность байт, rax не будет знать, что в нем лежит float
-    else if(const auto* v = std::get_if<double>(&e.value)){
     
-        double value = *v;
-        uint64_t bits = std::bit_cast<uint64_t>(value); //храним сырое представление битов
+    if(const auto* v = std::get_if<long long>(&e.value)) genIntLiteral(*v);
 
-        //потом addsd процессору - возьми нижние 64 бита и сложи их как double например
-
-        //для регистр <- константа нужен movabs для 64 битных
-        emit("mov rax, " + std::to_string(bits) + " ; float64 " + std::to_string(value)); //перекидываем сырые биты в rax 
-    }
+    //будем представлять наши вещественные числа как последовательность байт, rax не будет знать, что в нем лежит float
+    else if(const auto* v = std::get_if<double>(&e.value)) genFloatLiteral(*v);
 
     //строка - структура {length, data[]} - длина 8, дата столько сколько влезет
-    else if(const auto* v = std::get_if<std::string>(&e.value)){
-        std::string lbl = freshStrLabel(); //уникальная метка для строки .data
-
-        std::string escaped;
-
-        for(char c : *v){ //db `hello`, 10, `world`, 0 - "hello\nworld"
-            if(c == '\n') escaped += "`, 10, `";
-            else if(c == '\\') escaped += "\\\\";
-            else if(c == '"') escaped += "\\\"";
-            else escaped += c;
-        }
-
-        emitDataLabel(lbl + "_len");
-        emitData("dq " + std::to_string(v->size()));
-        emitDataLabel(lbl + "_dat"); //после длины следующие 8 байт
-        emitData("db `" + escaped + "`, 0"); //до байта 0 
-        emit("mov rax, " + lbl + "_len");
-    }
+    else if(const auto* v = std::get_if<std::string>(&e.value)) genStringLiteral(*v);
 
     else if(const auto* v = std::get_if<bool>(&e.value)){
         emit("mov rax, " + std::string(*v ? "1" : "0"));
@@ -515,6 +502,39 @@ void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
         emit("xor rax, rax"); //unit = 0
     }
 }
+
+//вспомогательные
+void CodeGenerator::genIntLiteral(long long v){
+    emit("mov rax, " + std::to_string(v));
+}
+
+void CodeGenerator::genFloatLiteral(double v){
+    uint64_t bits = std::bit_cast<uint64_t>(v); //храним сырое представление битов
+
+    //потом addsd процессору - возьми нижние 64 бита и сложи их как double например
+    //для регистр <- константа нужен movabs для 64 битных
+    emit("mov rax, " + std::to_string(bits) + " ; float64 " + std::to_string(v)); //перекидываем сырые биты в rax 
+}
+
+void CodeGenerator::genStringLiteral(const std::string& v){
+    std::string lbl = freshStrLabel(); //уникальная метка для строки .data
+
+    std::string escaped;
+
+    for(char c : v){ //db `hello`, 10, `world`, 0 - "hello\nworld"
+        if(c == '\n') escaped += "`, 10, `";
+        else if(c == '\\') escaped += "\\\\";
+        else if(c == '"') escaped += "\\\"";
+        else escaped += c;
+    }
+
+    emitDataLabel(lbl + "_len");
+    emitData("dq " + std::to_string(v.size()));
+    emitDataLabel(lbl + "_dat"); //после длины следующие 8 байт
+    emitData("db `" + escaped + "`, 0"); //до байта 0 
+    emit("mov rax, " + lbl + "_len");
+}
+
 
 //Unary
 void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
@@ -534,6 +554,7 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
         emit("xor rax, 1"); // 0 v 1 | 1 v 1 = false
     }
 }
+
 
 //Binary
 void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
@@ -555,98 +576,106 @@ void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
 
     if(isFloat) emit("movq xmm0, rax"); //левый в xmm0
 
-    if(isFloat){
-        switch(e.op){
-            case BinaryOp::Add: emit("addsd xmm0, xmm1"); break;
-            case BinaryOp::Sub: emit("subsd xmm0, xmm1"); break;
-            case BinaryOp::Mul: emit("mulsd xmm0, xmm1"); break;
-            case BinaryOp::Div: emit("divsd xmm0, xmm1"); break;
-            case BinaryOp::Eq:
-                emit("ucomisd xmm0, xmm1");
-                emit("sete al");
-                emit("movzx rax, al");
-                return;
-            case BinaryOp::Neq:
-                emit("ucomisd xmm0, xmm1");
-                emit("setne al");
-                emit("movzx rax, al");
-                return;
-            case BinaryOp::Lt:
-                emit("ucomisd xmm0, xmm1");
-                emit("setb al");
-                emit("movzx rax, al");
-                return;
-            case BinaryOp::Le:
-                emit("ucomisd xmm0, xmm1");
-                emit("setbe al");
-                emit("movzx rax, al");
-                return;
-            case BinaryOp::Gt:
-                emit("ucomisd xmm0, xmm1"); // меняем порядок
-                emit("seta al");
-                emit("movzx rax, al");
-                return;
-            case BinaryOp::Ge:
-                emit("ucomisd xmm0, xmm1");
-                emit("setae al");
-                emit("movzx rax, al");
-                return;
-            default: break;
-        }
-        emit("movq rax, xmm0");
-    } else {
-        switch(e.op){
-            case BinaryOp::Add: emit("add rax, rcx"); break;
-            case BinaryOp::Sub: emit("sub rax, rcx"); break;
-            case BinaryOp::Mul: emit("imul rax, rcx"); break;
-            case BinaryOp::Div:
-                emit("cqo");
-                emit("idiv rcx"); //rax - частное
-                break;
-            case BinaryOp::Mod:
-                emit("cqo");
-                emit("idiv rcx");
-                emit("mov rax, rdx");
-                break;
-            case BinaryOp::Eq:
-                emit("cmp rax, rcx"); //ZF = 1?
-                emit("sete al"); //al = 1?
-                emit("movzx rax, al");
-                break;
-            case BinaryOp::Neq:
-                emit("cmp rax, rcx");
-                emit("setne al");
-                emit("movzx rax, al");
-                break;
-            case BinaryOp::And:
-                emit("and rax, rcx");
-                break;
-            case BinaryOp::Or:
-                emit("or rax, rcx");
-                break;
-            case BinaryOp::Lt:
-                emit("cmp rax, rcx");
-                emit("setl al");
-                emit("movzx rax, al");
-                break;
-            case BinaryOp::Le:
-                emit("cmp rax, rcx");
-                emit("setle al");
-                emit("movzx rax, al");
-                break;
-            case BinaryOp::Gt: //ZF == 0 SF == и OF
-                emit("cmp rax, rcx");
-                emit("setg al");
-                emit("movzx rax, al");
-                break;
-            case BinaryOp::Ge:
-                emit("cmp rax, rcx");
-                emit("setge al"); //127 - (-1) //10000000
-                emit("movzx rax, al");
-                break;
-        }
+    if(isFloat) genFloatOp(e.op);
+    else genIntOp(e.op);
+}
+
+//вспомогательные
+void CodeGenerator::genFloatOp(BinaryOp op){
+    switch(op){
+        case BinaryOp::Add: emit("addsd xmm0, xmm1"); break;
+        case BinaryOp::Sub: emit("subsd xmm0, xmm1"); break;
+        case BinaryOp::Mul: emit("mulsd xmm0, xmm1"); break;
+        case BinaryOp::Div: emit("divsd xmm0, xmm1"); break;
+        case BinaryOp::Eq:
+            emit("ucomisd xmm0, xmm1");
+            emit("sete al");
+            emit("movzx rax, al");
+            return;
+        case BinaryOp::Neq:
+            emit("ucomisd xmm0, xmm1");
+            emit("setne al");
+            emit("movzx rax, al");
+            return;
+        case BinaryOp::Lt:
+            emit("ucomisd xmm0, xmm1");
+            emit("setb al");
+            emit("movzx rax, al");
+            return;
+        case BinaryOp::Le:
+            emit("ucomisd xmm0, xmm1");
+            emit("setbe al");
+            emit("movzx rax, al");
+            return;
+        case BinaryOp::Gt:
+            emit("ucomisd xmm0, xmm1"); // меняем порядок
+            emit("seta al");
+            emit("movzx rax, al");
+            return;
+        case BinaryOp::Ge:
+            emit("ucomisd xmm0, xmm1");
+            emit("setae al");
+            emit("movzx rax, al");
+            return;
+        default: break;
+    }
+    emit("movq rax, xmm0");
+}
+
+void CodeGenerator::genIntOp(BinaryOp op){
+    switch(op){
+        case BinaryOp::Add: emit("add rax, rcx"); break;
+        case BinaryOp::Sub: emit("sub rax, rcx"); break;
+        case BinaryOp::Mul: emit("imul rax, rcx"); break;
+        case BinaryOp::Div:
+            emit("cqo");
+            emit("idiv rcx"); //rax - частное
+            break;
+        case BinaryOp::Mod:
+            emit("cqo");
+            emit("idiv rcx");
+            emit("mov rax, rdx");
+            break;
+        case BinaryOp::Eq:
+            emit("cmp rax, rcx"); //ZF = 1?
+            emit("sete al"); //al = 1?
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Neq:
+            emit("cmp rax, rcx");
+            emit("setne al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::And:
+            emit("and rax, rcx");
+            break;
+        case BinaryOp::Or:
+            emit("or rax, rcx");
+            break;
+        case BinaryOp::Lt:
+            emit("cmp rax, rcx");
+            emit("setl al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Le:
+            emit("cmp rax, rcx");
+            emit("setle al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Gt: //ZF == 0 SF == и OF
+            emit("cmp rax, rcx");
+            emit("setg al");
+            emit("movzx rax, al");
+            break;
+        case BinaryOp::Ge:
+            emit("cmp rax, rcx");
+            emit("setge al"); //127 - (-1) //10000000
+            emit("movzx rax, al");
+            break;
     }
 }
+
+
 
 //Call - логика функций и лямбда
 void CodeGenerator::genCall(const CallExpr& e, FuncContext& ctx){
@@ -672,110 +701,19 @@ void CodeGenerator::genCall(const CallExpr& e, FuncContext& ctx){
     }
 
     if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
-
-        if(ident->name == "print"){
-            if(!e.args.empty()){
-                if(isFloatExpr(*e.args[0])){
-                    emit("call lang_print_float");
-                } else if(isStringExpr(*e.args[0])){
-                    emit("call __lang_print_str");
-                } else {
-                    emit("call __lang_print_int");
-                }
-            }
-        }
-
-        else if(ident->name == "input"){
-            emit("call __lang_read_str");
-        }
-
-        //читаем и парсим int
-        else if(ident -> name == "input_int"){
-            emit("call __lang_read_str");
-            emit("mov rdi, rax");
-            emit("call lang_parse_int");
-        }
-
-        else if(ident -> name == "input_float"){
-            emit("call __lang_read_str");
-            emit("mov rdi, rax");
-            emit("call lang_parse_float");
-        }
-
-        /*
-        else if(ident->name == "parse_int"){
-            emit("call lang_parse_int");
-        }
-
-        else if(ident->name == "parse_float"){
-            emit("call lang_parse_float");
-        } */ //пока без этого
-
-        else if(ident->name == "exit"){
-            emit("call __lang_exit");
-        }
-
-        else if(ident->name == "panic"){
-            emit("call __lang_panic");
-        }
-
-        else {
-            auto it = m_funcLabels.find(ident->name); //глобальная функция пользователя
-            if(it != m_funcLabels.end()){
-                emit("call " + it->second); //название фнукции
-            } else{
-                auto off = ctx.findLocal(ident->name); //let f = \x: int64 ...  || f(5)
-                if(off){
-                    emit("mov rax, [rbp" + std::to_string(*off) + "]"); //closure ptr
-                    emit("mov r11, [rax]");
-                    emit("mov rdi, [rax + 8]");
-                    
-                    //на стек отправятся
-                    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 5; i--){
-                        emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
-                    }
-
-                    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 0 && i < 5; i--){
-                        emit("mov " + std::string(argReg(i + 1)) +
-                             ", [rbp" + std::to_string(argOffsets[i]) + "]"); //rdi указатель на env
-                    }
-                    emit("call r11");
-
-                    int stackArgs = static_cast<int>(argOffsets.size()) - 5;
-                    if(stackArgs > 0){
-                        emit("add rsp, " + std::to_string(stackArgs * 8));
-                    }
-                }
-            }
-        }
-    } else {
-        genExpr(*e.callee, ctx); //closure pointer rax
-        emit("mov r11, [rax]");
-        emit("mov rdi, [rax + 8]");
-
-        for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 5; i--){
-            emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
-        }
-
-        for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 0 && i < 5; i--){
-            emit("mov " + std::string(argReg(i + 1)) +
-                 ", [rbp" + std::to_string(argOffsets[i]) + "]");
-        }
-
-        emit("call r11"); //call __fn_double - лямбда замыкание
-       
-        int stackArgs = static_cast<int>(argOffsets.size()) - 5;
-        if(stackArgs > 0){
-            emit("add rsp, " + std::to_string(stackArgs * 8));
-        }
+        genCallIdent(*ident, e, argOffsets, ctx);
+    } else { //вызываемое не идентификатор, результат выражения
+        genExpr(*e.callee, ctx);
+        genCallClosure(argOffsets);
+    }
+        
         /* 
         *fn double(x: int64) -> int64 -> int64 =
-        *\y: int64 -> x * y
+        *\y: int64 -> x * y //возвратим 2 * y - адрес функции | x = 2
 
         *fn main() -> int64 =
-        *double(2)(10)
+        *double(2)(10) //double(2) вовзращает лямбду
         */
-    }
 
     int stackArgs = static_cast<int>(argOffsets.size()) - 6;
     if(stackArgs > 0){
@@ -786,6 +724,103 @@ void CodeGenerator::genCall(const CallExpr& e, FuncContext& ctx){
         ctx.removeLocal("__arg");
     }
 }
+
+//вспомогательные
+void CodeGenerator::genCallBuiltin(const IdentExpr& ident, const CallExpr& e){
+    if(ident.name == "print"){
+        if(!e.args.empty()){
+            if(isFloatExpr(*e.args[0])){
+                emit("call lang_print_float");
+            } else if(isStringExpr(*e.args[0])){
+                emit("call __lang_print_str");
+            } else {
+                emit("call __lang_print_int");
+            }
+        }
+    }
+
+    else if(ident.name == "input"){
+        emit("call __lang_read_str");
+    }
+
+    //читаем и парсим int
+    else if(ident.name == "input_int"){
+        emit("call __lang_read_str");
+        emit("mov rdi, rax");
+        emit("call lang_parse_int");
+    }
+
+    else if(ident.name == "input_float"){
+        emit("call __lang_read_str");
+        emit("mov rdi, rax");
+        emit("call lang_parse_float");
+    }
+
+    /*
+    else if(ident->name == "parse_int"){
+        emit("call lang_parse_int");
+    }
+
+    else if(ident->name == "parse_float"){
+        emit("call lang_parse_float");
+    } */ //пока без этого
+
+    else if(ident.name == "exit"){
+        emit("call __lang_exit");
+    }
+
+    else if(ident.name == "panic"){
+        emit("call __lang_panic");
+    }
+}
+    
+void CodeGenerator::genCallClosure(const std::vector<int>& argOffsets){ 
+    emit("mov r11, [rax]");
+    emit("mov rdi, [rax + 8]");
+
+    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 5; i--){
+        emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
+    }
+
+    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 0 && i < 5; i--){
+        emit("mov " + std::string(argReg(i + 1)) +
+                ", [rbp" + std::to_string(argOffsets[i]) + "]");
+    }
+
+    emit("call r11"); //call __fn_double - лямбда замыкание
+    
+    int stackArgs = static_cast<int>(argOffsets.size()) - 5;
+    if(stackArgs > 0){
+        emit("add rsp, " + std::to_string(stackArgs * 8));
+    }
+    /* 
+    *fn double(x: int64) -> int64 -> int64 =
+    *\y: int64 -> x * y
+
+    *fn main() -> int64 =
+    *double(2)(10)
+    */
+}
+
+//обрабатывает функцию по имени
+void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
+    const std::vector<int>& argOffsets, FuncContext& ctx){ 
+
+        auto it = m_funcLabels.find(ident.name);
+        if(it != m_funcLabels.end()){
+            emit("call " + it->second);
+            return;
+        }
+
+        if(genCallBuiltin(ident, e), true) return; //встроенная функция
+
+        auto off = ctx.findLocal(ident.name);
+        if(off){
+            emit("mov rax, [rbp" + std::to_string(*off) + "]");
+            genCallClosure(argOffsets); //ptr_lambda + captured_env
+        }
+}
+
 
 
 //If
@@ -806,6 +841,8 @@ void CodeGenerator::genIf(const IfExpr& e, FuncContext& ctx){
     emitLabel(endLabel); //после выполнения нужно ветки
 }
 
+
+
 //LetIn
 void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
     std::vector<std::string> boundNames; //let x, y = ... (x and y)
@@ -824,6 +861,8 @@ void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
         ctx.removeLocal(name);
     }
 }
+
+
 
 //Tuple {int64 count; int64 elems[count]} - куча
 void CodeGenerator::genTuple(const TupleExpr& e, FuncContext& ctx){
@@ -858,6 +897,8 @@ void CodeGenerator::genTuple(const TupleExpr& e, FuncContext& ctx){
 
     for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
 }
+
+
 
 //со списками интереснее, список может быть двух типов пустым Nil и непустым cons(head, tail)
 //у пустого тег - 0, у непустого тег 1, чтобы в паттернс мэтчинг различать
@@ -897,7 +938,8 @@ void CodeGenerator::genList(const ListExpr& e, FuncContext& ctx){
 }
 
 
-//ADT constructor { int64 tag; int64 fields[]} //tag конструктора - его индекс
+
+//ADT constructor { int64 tag; int64 fields[]} //tag конструктора - его индекс - генерация похожа на tuple
 void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
     std::size_t n = e.args.size();
     std::size_t size = 8 + n * 8;
@@ -931,43 +973,55 @@ void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
     for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
 }
 
-//field access || модуль либо же именнованный конструктор
 
+
+//field access || модуль либо же именнованный конструкторы
 void CodeGenerator::genFieldAccess(const FieldAccessExpr& e, FuncContext& ctx){
 
     if(const auto* ident = std::get_if<IdentExpr>(&e.object->var)){
-        std::string fullName = ident->name + "." + e.field;
-
-        auto it = m_funcLabels.find(fullName); //ищем полное описанное имя среди сгенерированных функций
-        if(it != m_funcLabels.end()){
-            emit("mov rax, " + it->second); //адрес функции
-            return;
-        }
+        if(genModuleFieldAccess(*ident, e)) return;
     }
 
-    //именованный конструктор
+    //вычислили объект, ищем его в полях конструктора -> gen mov rax, [rax + 8]
     genExpr(*e.object, ctx);
+    genNamedCtorFieldAccess(e);
+}
 
+//вспомогательные
+bool CodeGenerator::genModuleFieldAccess(const IdentExpr& ident, const FieldAccessExpr& e){
+    std::string fullName = ident.name + "." + e.field;
+
+    auto it = m_funcLabels.find(fullName); //ищем полное описанное имя среди сгенерированных функций
+    if(it != m_funcLabels.end()) return false;
+    emit("mov rax, " + it->second); //адрес функции
+    return true;
+}
+
+void CodeGenerator::genNamedCtorFieldAccess(const FieldAccessExpr& e){ 
     auto it = m_exprTypes.find(e.object.get());
+    if(it == m_exprTypes.end()) return;
+
     const auto* st = std::get_if<SimpleType>(&it->second->var);
-    if(st){
-        auto dataInfo = m_registry.lookupData(st->name); //находим ADT
-        if(dataInfo){
-            for(const auto& ctor : dataInfo->constructors){ //поле во всех ctors
-                for(int i = 0; i < (int)ctor.fieldNames.size(); ++i){
-                    if(ctor.fieldNames[i] == e.field){
-                        emit("mov rax, [rax + " + 
-                            std::to_string(8 + i * 8) + "]"); //tag + field0 + ...
-                        return;
-                    }
-                }
+    if(!st) return;
+        
+    auto dataInfo = m_registry.lookupData(st->name); //находим ADT
+    if(!dataInfo) return;
+        
+    for(const auto& ctor : dataInfo->constructors){ //поле во всех ctors
+        for(std::size_t i = 0; i < ctor.fieldNames.size(); ++i){
+            if(ctor.fieldNames[i] == e.field){
+                emit("mov rax, [rax + " + 
+                    std::to_string(8 + i * 8) + "]"); //tag + field0 + ...
+                return;
             }
         }
     }
 }
 
+
+
 //Patterns matching
-//match
+//match ???
 void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
     genExpr(*e.target, ctx); //получаем желаемый тип //в кучу и указатель
 
@@ -999,7 +1053,7 @@ void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
     *если паттерн подошел прыгнем в endLabel иначе скип и переходим дальше
     */
 
-    //если ни один паттерн не подошел, семантика не проверяет - ???
+    //если ни один паттерн не подошел, семантика не проверяет - ??? - исчерпываемость
     std::string panicMsg = freshStrLabel();
     emitDataLabel(panicMsg + "_len");
     emitData("dq 22");
@@ -1012,13 +1066,15 @@ void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
     ctx.removeLocal("__target");
 }
 
-//проверка шаблона с заданный значением перед match
-void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& valueReg,
-                const std::string& failLabel, FuncContext& ctx){
 
-    if(std::get_if<WildcardPatternNode>(&pattern.var)){ //всегда подходит
-        return;
-    }
+//проверка шаблона с заданным значением перед match
+void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& valueReg,
+    const std::string& failLabel, FuncContext& ctx){
+
+    if(valueReg != "rax") emit("mov rax, " + valueReg);
+
+    //перебор случаев
+    if(std::get_if<WildcardPatternNode>(&pattern.var)) return; //всегда подходит
 
     /* PatternName
     *match 10{
@@ -1028,83 +1084,138 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
 
     //связываем переменную с текущим значением
     if(const auto* p = std::get_if<NamePatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
-        int off = ctx.allocLocal(p->name); //локальная переменная с именмем паттерна
-        emit("mov [rbp" + std::to_string(off) + "], rax");
-        return; 
+        genNamePattern(*p, failLabel, ctx);
+        return;
     }
 
     //если литерал, просто сравниваем значение
-    if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
-
-        if(p->kind == LiteralPatternNode::Kind::Int ||
-           p->kind == LiteralPatternNode::Kind::Bool){
-
-            //проверка на float пока не осуществляется
-
-            long long value = 0;
-            if(p->value == "yep") value = 1;
-            else if(p->value == "nope") value = 0; 
-            else value = std::stoll(p->value); //переводим лексему в число
-            emit("cmp rax, " + std::to_string(value));
-            emit("jne " + failLabel);
-        }
-
-        else if(p->kind == LiteralPatternNode::Kind::Real){
-            double value = std::stod(p->value);
-            uint64_t bits = std::bit_cast<uint64_t>(value);
-            emit("mov rcx, " + std::to_string(bits));
-            emit("cmp rax, rcx");
-            emit("jne " + failLabel);
-        }
-
-        else if(p->kind == LiteralPatternNode::Kind::String){
-            std::string label = freshStrLabel();
-            std::string escaped;
-
-            for(char c : p->value){ //db `hello`, 10, `world`, 0 - "hello\nworld"
-                if(c == '\n') escaped += "`, 10, `";
-                else if(c == '\\') escaped += "\\\\";
-                else if(c == '"') escaped += "\\\"";
-                else escaped += c;
-            }
-
-            emitDataLabel(label + "_len");
-            emitData("dq " + std::to_string(p->value.size()));
-            emitDataLabel(label + "_dat"); //после длины следующие 8 байт
-            emitData("db `" + escaped + "`, 0"); //до байта 0 
-            
-            emit("mov rdi, rax"); //rdi - target, rsi - pattern_str
-            emit("mov rsi, " + label);
-            emit("call lang_str_eq");
-            emit("cmp rax, 0");
-            emit("jz " + failLabel);
-        }
-        return;
+    if(const auto* p = std::get_if<LiteralPatternNode>(&pattern.var)){ 
+        genLiteralPattern(*p, failLabel);
     }
 
     //Кортеж
     if(const auto* p = std::get_if<TuplePatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
-        int ptrOff = ctx.allocLocal("__tupptr");
-        emit("mov [rbp" + std::to_string(ptrOff) + "], rax"); //сохраняем указатель на кортеж
-
-        for(std::size_t i = 0; i < p->elems.size(); ++i){
-            emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
-            emit("mov rax, [rax + " + std::to_string(8 + i * 8) + "]"); //rax уже указатель на первый элемент
-
-            genPattern(*p->elems[i], "rax", failLabel, ctx); //если не подходит, значит текущая ветка кортежа - skip
-        }
-        ctx.removeLocal("__tupptr");
+        genTuplePattern(*p, failLabel, ctx);
         return;
     }
 
     //ADT
-    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
+    if(const auto* p = std::get_if<ConstructorPatternNode>(&pattern.var)){ 
+        genConstructorPattern(*p, failLabel, ctx);
+        return;
+    }
 
-        int tag = getConstructorTag(p->name); //достаем тег
+    //cons - pattern x : xs
+    if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
+        genConsPattern(*p, failLabel, ctx);
+        return;
+    }
+
+    //list [] или [1, 2, 3, ...]
+    //проход в нормальном порядке в отличие от создания
+    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){
+        genListPattern(*p, failLabel, ctx);
+        return;
+    }
+
+}
+
+//вспомогательные
+void CodeGenerator::genNamePattern(const NamePatternNode& p, 
+    const std::string& valueReg, FuncContext& ctx){
+
+        int off = ctx.allocLocal(p.name); //локальная переменная с именмем паттерна
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+}
+
+void CodeGenerator::genLiteralPattern(const LiteralPatternNode& p, 
+    const std::string& failLabel){
+
+        if(p.kind == LiteralPatternNode::Kind::Int ||
+           p.kind == LiteralPatternNode::Kind::Bool){
+
+            genIntBoolLiteralPattern(p, failLabel);
+        }
+
+        else if(p.kind == LiteralPatternNode::Kind::Real){
+            genRealLiteralPattern(p, failLabel);
+        }
+
+        else if(p.kind == LiteralPatternNode::Kind::String){
+            genStringLiteralPattern(p, failLabel);
+        }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//вспомогательные для genLitPat()
+void CodeGenerator::genIntBoolLiteralPattern(const LiteralPatternNode& p, 
+    const std::string& failLabel){
+
+        long long value = 0;
+        if(p.value == "yep") value = 1;
+        else if(p.value == "nope") value = 0; 
+        else value = std::stoll(p.value); //переводим лексему в число
+        emit("cmp rax, " + std::to_string(value));
+        emit("jne " + failLabel);
+
+}
+
+void CodeGenerator::genRealLiteralPattern(const LiteralPatternNode& p, 
+    const std::string& failLabel){
+
+        double value = std::stod(p.value);
+        uint64_t bits = std::bit_cast<uint64_t>(value);
+        emit("mov rcx, " + std::to_string(bits));
+        emit("cmp rax, rcx");
+        emit("jne " + failLabel);
+
+}
+
+void CodeGenerator::genStringLiteralPattern(const LiteralPatternNode& p,
+    const std::string& failLabel){
+
+        std::string label = freshStrLabel();
+        std::string escaped;
+
+        for(char c : p.value){ //db `hello`, 10, `world`, 0 - "hello\nworld"
+            if(c == '\n') escaped += "`, 10, `";
+            else if(c == '\\') escaped += "\\\\";
+            else if(c == '"') escaped += "\\\"";
+            else escaped += c;
+        }
+
+        emitDataLabel(label + "_len");
+        emitData("dq " + std::to_string(p.value.size()));
+        emitDataLabel(label + "_dat"); //после длины следующие 8 байт
+        emitData("db `" + escaped + "`, 0"); //до байта 0 
+        
+        emit("mov rdi, rax"); //rdi - target, rsi - pattern_str
+        emit("mov rsi, " + label);
+        emit("call lang_str_eq");
+        emit("cmp rax, 0");
+        emit("jz " + failLabel);
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void CodeGenerator::genTuplePattern(const TuplePatternNode& p, 
+    const std::string& failLabel, FuncContext& ctx){
+
+    int ptrOff = ctx.allocLocal("__tupptr");
+    emit("mov [rbp" + std::to_string(ptrOff) + "], rax"); //сохраняем указатель на кортеж
+
+    for(std::size_t i = 0; i < p.elems.size(); ++i){
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+        emit("mov rax, [rax + " + std::to_string(8 + i * 8) + "]"); //rax уже указатель на первый элемент
+
+        genPattern(*p.elems[i], "rax", failLabel, ctx); //если не подходит, значит текущая ветка кортежа - skip
+    }
+    ctx.removeLocal("__tupptr");
+}
+
+void CodeGenerator::genConstructorPattern(const ConstructorPatternNode& p, 
+    const std::string& failLabel, FuncContext& ctx){
+
+        int tag = getConstructorTag(p.name); //достаем тег
         emit("mov rcx, [rax]");
         emit("cmp rcx, " + std::to_string(tag));
         emit("jne " + failLabel); //тег не совпал - вышли
@@ -1113,73 +1224,72 @@ void CodeGenerator::genPattern(const PatternNode& pattern, const std::string& va
         emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
 
         // Рекурсивно проверяем аргументы паттерна
-        for(std::size_t i = 0; i < p->args.size(); ++i){
+        for(std::size_t i = 0; i < p.args.size(); ++i){
             emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
             emit("mov rax, [rax + " + std::to_string(8 + i * 8) + "]");
-            genPattern(*p->args[i], "rax", failLabel, ctx);
+            genPattern(*p.args[i], "rax", failLabel, ctx);
         }
 
         ctx.removeLocal("__ctor_ptr");
-        return;
-    }
+}
 
-    //cons - pattern x : xs
-    if(const auto* p = std::get_if<ConsPatternNode>(&pattern.var)){
-    if(valueReg != "rax") emit("mov rax, " + valueReg);
+void CodeGenerator::genConsPattern(const ConsPatternNode& p, 
+    const std::string& failLabel, FuncContext& ctx){
 
-    emit("mov rcx, [rax]");
-    emit("cmp rcx, 0");
-    emit("jz " + failLabel);
+        emit("mov rcx, [rax]");
+        emit("cmp rcx, 0");
+        emit("jz " + failLabel);
 
-    int listOff = ctx.allocLocal("__list");
-    emit("mov [rbp" + std::to_string(listOff) + "], rax");
+        int listOff = ctx.allocLocal("__list");
+        emit("mov [rbp" + std::to_string(listOff) + "], rax");
 
-    emit("mov rax, [rbp" + std::to_string(listOff) + "]");
-    emit("mov rcx, [rax + 8]");
-    genPattern(*p->head, "rcx", failLabel, ctx);
+        emit("mov rax, [rbp" + std::to_string(listOff) + "]");
+        emit("mov rcx, [rax + 8]");
+        genPattern(*p.head, "rcx", failLabel, ctx);
 
-    emit("mov rax, [rbp" + std::to_string(listOff) + "]");
-    emit("mov rcx, [rax + 16]");
-    genPattern(*p->tail, "rcx", failLabel, ctx);
+        emit("mov rax, [rbp" + std::to_string(listOff) + "]");
+        emit("mov rcx, [rax + 16]");
+        genPattern(*p.tail, "rcx", failLabel, ctx);
 
-    ctx.removeLocal("__list");
-    return;
-    }
-    //list [] или [1, 2, 3, ...]
-    //проход в нормальном порядке в отличие от создания
-    if(const auto* p = std::get_if<ListPatternNode>(&pattern.var)){
-        if(valueReg != "rax") emit("mov rax, " + valueReg);
+        ctx.removeLocal("__list");
+}
 
-        if(p->elems.empty()){
+void CodeGenerator::genListPattern(const ListPatternNode& p,
+    const std::string& failLabel, FuncContext& ctx){
+
+        if(p.elems.empty()){
             emit("mov rcx, [rax]");
             emit("cmp rcx, 0");
-            emit("jnz " + failLabel); //не кончился ли список раньше паттерна
-        } else {
-            for(const auto& elem : p->elems){
-                emit("mov rcx, [rax]");
-                emit("сmp rcx, 0");
-                emit("jz " + failLabel); //если список закончился раньше паттерна - Nil => tag = 0
-
-                emit("mov rcx, [rax + 16]"); //tail будет нужен для следующей итерации - разворчиваем cons
-                int tailOff = ctx.allocLocal("__lpt");
-                emit("mov [rbp" + std::to_string(tailOff) + "], rcx");
-
-                emit("mov rax, [rax + 8]");
-                genPattern(*elem, "rax", failLabel, ctx); //проверяем head
-
-                emit("mov rax, [rbp" + std::to_string(tailOff) + "]"); //хвост становится новым cons
-                ctx.removeLocal("__lpt");
-            }
-            
-            emit("mov rcx, [rax]");
-            emit("cmp rcx, 0");
-            emit("jnz " + failLabel); //что список нужной длины
+            emit("jnz " + failLabel); //если [], но список не пустой
+            return;
         }
-        return;
-    }
+
+        for(const auto& elem : p.elems){
+            emit("mov rcx, [rax]");
+            emit("сmp rcx, 0");
+            emit("jz " + failLabel); //если список закончился раньше паттерна - Nil => tag = 0
+
+            emit("mov rcx, [rax + 16]"); //tail будет нужен для следующей итерации - разворчиваем cons
+            int tailOff = ctx.allocLocal("__lpt");
+            emit("mov [rbp" + std::to_string(tailOff) + "], rcx");
+
+            emit("mov rax, [rax + 8]");
+            genPattern(*elem, "rax", failLabel, ctx); //проверяем head
+
+            emit("mov rax, [rbp" + std::to_string(tailOff) + "]"); //хвост становится новым cons
+            ctx.removeLocal("__lpt");
+        }
+            
+        emit("mov rcx, [rax]");
+        emit("cmp rcx, 0");
+        emit("jnz " + failLabel); //список не закончился - лишние элементы
 }
 
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//лямбда и замыкания
 
 // \y -> x + y ==> x - free, берем, например, из let
 std::vector<std::string> CodeGenerator::findFreeVars(
@@ -1279,6 +1389,8 @@ void CodeGenerator::scanExpr(const ExprNode& expr, const std::vector<std::string
     }
 }
 
+
+
 //проблема такая же как в genFuncDecl - нужен временный буфер чтобы узнать stacksize
 //асемблерный код для тела лямбды | rdi - указатель на захваченные переменные - rsi, rdi, rcx, ... явные параметры
 std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
@@ -1299,6 +1411,29 @@ std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
     int envOff = ctx.allocLocal("__env");
     emit("mov [rbp" + std::to_string(envOff) + "], rdi"); //ptr на внешнее окружение
 
+    genLambdaCaptured(captured, envOff, ctx);
+    genLambdaParams(e, ctx);
+    genExpr(*e.body, ctx);
+
+    std::string body = m_text.str(); //чтобы узнать точный размер стека
+    std::swap(m_text, bodyStream);
+
+    int stackSize = ctx.alignedStackSize();
+    if(stackSize > 0){
+        emit("sub rsp, " + std::to_string(stackSize));
+    }
+
+    m_text << body; //весь текст обратно
+    emit("mov rsp, rbp");
+    emit("pop rbp");
+    emit("ret");
+    m_text << "\n";
+
+    return funcLabel;
+}
+
+//вспомогательные генерации самого кода лямбда функции
+void CodeGenerator::genLambdaCaptured(const std::vector<std::string>& captured, int envOff, FuncContext& ctx){
     for(std::size_t i = 0; i < captured.size(); ++i){
         int offset = ctx.allocLocal(captured[i]);
         emit("mov rax, [rbp" + std::to_string(envOff) + "]");
@@ -1307,8 +1442,11 @@ std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
         //сохраняем внешнюю переменную как обычную переменную лямбды
         emit("mov [rbp" + std::to_string(offset) + "], rax");
     }
+}
 
-    static const char* lambdaArgRegs[] = {"rsi","rdx","rcx","r8","r9"};
+void CodeGenerator::genLambdaParams(const LambdaExpr& e, FuncContext& ctx){
+    static const char* lambdaArgRegs[] = {"rsi","rdx","rcx","r8","r9"}; //живет до конца программы
+    
     for(std::size_t i = 0; i < e.params.size() && i < 5; ++i){
         int offset = ctx.allocLocal(e.params[i].name);
         emit("mov [rbp" + std::to_string(offset) + "], " + std::string(lambdaArgRegs[i]));
@@ -1321,26 +1459,9 @@ std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
         emit("mov rax, [rbp + " + std::to_string(stackArgOffset) + "]"); //кладем из общего стека (стека вызывающей функции)
         emit("mov [rbp" + std::to_string(offset) + "], rax"); //в стек нашей функции
     }
-
-    genExpr(*e.body, ctx);
-
-    // эпилог
-    std::string body = m_text.str(); //чтобы узнать точный размер стека
-    std::swap(m_text, bodyStream);
-
-    int stackSize = ctx.alignedStackSize();
-    if(stackSize > 0){
-        emit("sub rsp, " + std::to_string(stackSize));
-    }
-
-    m_text << body;
-    emit("mov rsp, rbp");
-    emit("pop rbp");
-    emit("ret");
-    m_text << "\n";
-
-    return funcLabel;
 }
+
+
 
 //для замыкания нужен сам код и env - в куче объект замыкания {code ptr, env_ptr}
 //основная функция лямбды - работает по аналогу с обычной функцией, но "улучшенная" версия

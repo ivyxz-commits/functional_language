@@ -107,7 +107,11 @@ private:
 
     //declarations
     void genDecl(const DeclNode& decl);
+
+    //Объявление функции со вспомогательной функцией
     void genFuncDecl(const FuncDecl& fn);
+    void genFuncParams(const FuncDecl& fn, FuncContext& ctx);
+
     void genModuleDecl(const ModuleDecl& mod);
 
     //expressions - rax
@@ -115,7 +119,6 @@ private:
     void genLiteral(const LiteralExpr& e, FuncContext& ctx);
     void genIdent(const IdentExpr& e, FuncContext& ctx);
     void genUnary(const UnaryExpr& e, FuncContext& ctx);
-    void genBinary(const BinaryExpr& e, FuncContext& ctx);
     void genCall(const CallExpr& e, FuncContext& ctx);
     void genIf(const IfExpr& e, FuncContext& ctx);
     void genMatch(const MatchExpr& e, FuncContext& ctx);
@@ -124,14 +127,80 @@ private:
     void genTuple(const TupleExpr& e, FuncContext& ctx);
     void genList(const ListExpr& e, FuncContext& ctx);
     void genConstructor(const ConstructorExpr& e, FuncContext& ctx);
+
+    ///////////////////////////////////////////////////////////////////////////////
+    void genLiteral(const LiteralExpr& e, FuncContext& ctx);
+    //вспомогательные
+    void genIntLiteral(long long v);
+    void genFloatLiteral(double v);
+    void genStringLiteral(const std::string& v);    
+
+    ///////////////////////////////////////////////////////////////////////////////
+    void genBinary(const BinaryExpr& e, FuncContext& ctx);
+    //вспомогательные
+    void genFloatOp(BinaryOp op);
+    void genIntOp(BinaryOp op);
+
+    ///////////////////////////////////////////////////////////////////////////////
     void genFieldAccess(const FieldAccessExpr& e, FuncContext& ctx);
+    //вспомогательные
+    bool genModuleFieldAccess(const IdentExpr& ident, const FieldAccessExpr& e);
+    void genNamedCtorFieldAccess(const FieldAccessExpr& e);
+
+    ///////////////////////////////////////////////////////////////////////////////
+    void genCall(const CallExpr& e, FuncContext& ctx);
+    //вспомогательные
+    void genCallBuiltin(const IdentExpr& ident, const CallExpr& e);
+    void genCallClosure(const std::vector<int>& argOffsets);
+    void genCallIdent(const IdentExpr& ident, const CallExpr& e,
+        const std::vector<int>& argOffsets, FuncContext& ctx); 
+
+
+
 
     //patterns matching
     void genPattern(const PatternNode& pattern, const std::string& valueReg, //target
                     const std::string& failLabel, FuncContext& ctx); //failLabel - метка следующей ветки match
 
+    //вспомогательные
+    void genNamePattern(const NamePatternNode& p, 
+        const std::string& valueReg, FuncContext& ctx);
+
+    void genTuplePattern(const TuplePatternNode& p, 
+        const std::string& failLabel, FuncContext& ctx);
+
+    void genConstructorPattern(const ConstructorPatternNode& p, 
+        const std::string& failLabel, FuncContext& ctx);
+
+    void genConsPattern(const ConsPatternNode& p, 
+        const std::string& failLabel, FuncContext& ctx);
+
+    void genListPattern(const ListPatternNode& p,
+        const std::string& failLabel, FuncContext& ctx);
+
+    void genLiteralPattern(const LiteralPatternNode& p, 
+        const std::string& failLabel);
+    ////////////////////////////////////////////////////////////
+    //у genLitPat() свои подфункции
+    void genIntBoolLiteralPattern(const LiteralPatternNode& p, 
+        const std::string& failLabel);
+
+    void genRealLiteralPattern(const LiteralPatternNode& p, 
+        const std::string& failLabel);
+
+    void genStringLiteralPattern(const LiteralPatternNode& p,
+        const std::string& failLabel);
+
+
+
+
+
     //замыкания
     std::string genLambdaFunc(const LambdaExpr& e, const std::vector<std::string>& captured, FuncContext& outer);
+    //у нее две свои вспомогательные
+    void genLambdaCaptured(const std::vector<std::string>& captured, int envOff, FuncContext& ctx);
+    void genLambdaParams(const LambdaExpr& e, FuncContext& ctx);  
+    //+
     std::vector<std::string> findFreeVars(const LambdaExpr& e, const FuncContext& ctx) const; // \y -> x + y ==> x - free, берем, например, из let
     //вспомогательная к findFreeVars
     void scanExpr(const ExprNode& expr, const std::vector<std::string>& bound, const FuncContext& ctx, std::vector<std::string>& result) const;
