@@ -71,7 +71,7 @@ static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
 
 //analyzeExpr()
 static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
-    if(std::get_if<long long>(&e.value)) return makeBuiltin("int64");
+    if(std::get_if<int64_t>(&e.value)) return makeBuiltin("int64");
     if(std::get_if<double>(&e.value)) return makeBuiltin("float64");
     if(std::get_if<std::string>(&e.value)) return makeBuiltin("string");
     if(std::get_if<bool>(&e.value)) return makeBuiltin("bool");
@@ -1347,6 +1347,31 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeList(
     return makeList(*firstType);
 }
 
+
+//Cons
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCons(
+    const ConsExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+        
+        auto headType = analyzeExpr(*e.head, env, errors);
+        auto tailType = analyzeExpr(*e.tail, env, errors);
+        if(!headType || !tailType) return std::nullopt;
+
+        auto* listType = std::get_if<ListType>(&(*tailType)->var);
+        if(!listType){
+            errors.push_back(makeError(
+                "cons tail must be a list, got '" + (*tailType)->toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        if(!typesCompatible(**headType, *listType -> elem)){
+            errors.push_back(makeError(
+                "cons head type '" + (*headType) -> toString() +
+                "' does not match list element type '" + listType -> elem -> toString() + "'", e.pos));
+            return std::nullopt;
+        }
+
+        return makeList(*headType);
+}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

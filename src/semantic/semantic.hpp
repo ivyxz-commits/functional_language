@@ -289,6 +289,7 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeUnary(const UnaryExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeTuple(const TupleExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
     std::optional<sPtr<TypeInfo>> analyzeList(const ListExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    std::optional<sPtr<TypeInfo>> analyzeCons(const ConsExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
     ////////////////////////////////////////
     //Binary

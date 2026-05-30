@@ -15,7 +15,12 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseExpr(){
     if(check(TT::KW_MATCH)) return parseMatchExpr();
     if(check(TT::OP_BACKSLASH)) return parseLambdaExpr();
 
-    return parseLogicalOr();
+    auto expr = parseLogicalOr();
+    if(!expr) return std::unexpected(expr.error());
+
+    if(check(TT::OP_COLON)) return parseConsExpr(std::move(*expr));
+
+    return expr;
 }
 
 //letExpr ::= 'let' bindingList 'in' expr
@@ -328,6 +333,18 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
     return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
 }
 
+//x : xs || x : [2, 3, 4] => [x, 2, 3, 4]
+std::expected<Ptr<ExprNode>, ParseError> Parser::parseConsExpr(Ptr<ExprNode> head){
+    using TT = Lexer::TokenType;
+    auto pos = currentPos();
+
+    advance();
+    auto tail = parseExpr(); 
+    if(!tail) return std::unexpected(tail.error());
+
+    ConsExpr ce{std::move(head), std::move(*tail), pos};
+    return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные функции 
@@ -521,13 +538,14 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
     return std::make_unique<ExprNode>(ExprNode{std::move(ie), pos});
 }
 
+
 std::expected<Ptr<ExprNode>, ParseError> Parser::parseLiteral(){
     using TT = Lexer::TokenType;
     auto pos = currentPos();
 
     if(check(TT::LIT_INT)){
         std::string lex = advance().lexeme;
-        long long value = 0; //T - автоматически компилятором определяется
+        int64_t value = 0; //T - автоматически компилятором определяется
         for(char ch : lex) value = value * 10 + (ch - '0');
         return makeLiteral(value, pos);
     }

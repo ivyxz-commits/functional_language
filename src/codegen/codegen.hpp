@@ -126,12 +126,14 @@ private:
     void genLetIn(const LetInExpr& e, FuncContext& ctx);
     void genTuple(const TupleExpr& e, FuncContext& ctx);
     void genList(const ListExpr& e, FuncContext& ctx);
+    void genCons(const ConsExpr& e, FuncContext& ctx);
     void genConstructor(const ConstructorExpr& e, FuncContext& ctx);
+    
 
     ///////////////////////////////////////////////////////////////////////////////
     void genLiteral(const LiteralExpr& e, FuncContext& ctx);
     //вспомогательные
-    void genIntLiteral(long long v);
+    void genIntLiteral(int64_t v);
     void genFloatLiteral(double v);
     void genStringLiteral(const std::string& v);    
 

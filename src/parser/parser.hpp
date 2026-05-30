@@ -75,6 +75,7 @@ private:
     std::expected<Ptr<ExprNode>, ParseError> parseUnary();
     std::expected<Ptr<ExprNode>, ParseError> parsePostfix(); //цепочка операций после основного выражения
     std::expected<Ptr<ExprNode>, ParseError> parsePrimary();
+    std::expected<Ptr<ExprNode>, ParseError> parseConsExpr(Ptr<ExprNode> head);
 
     //вспомогательные функции
     //для выражений

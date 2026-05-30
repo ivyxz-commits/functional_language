@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 #include <variant>
+#include <cstdint>
 #include "tokens.hpp"
 
 
@@ -167,7 +168,7 @@ struct ExprNode;
 
 //Примитивные выражения
 using LiteralValue = std::variant<
-    long long,
+    int64_t,
     double, 
     std::string,
     bool,
@@ -299,10 +300,16 @@ struct ListExpr{
     Pos pos; 
 };
 
-
 struct ConstructorExpr{ 
     std::string name;
     std::vector<Ptr<ExprNode>> args;
+    Pos pos;
+};
+
+//x : xs - но добавлением элемента в список
+struct ConsExpr{
+    Ptr<ExprNode> head;
+    Ptr<ExprNode> tail;
     Pos pos;
 };
 /* data Shape = Circle(float64) | Rect(float64, float64) - декларация
@@ -327,7 +334,8 @@ using ExprNodeVar = std::variant<
     LambdaExpr,
     TupleExpr,
     ListExpr,
-    ConstructorExpr
+    ConstructorExpr,
+    ConsExpr
 >;
 
 struct ExprNode{ 

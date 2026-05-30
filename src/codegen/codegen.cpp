@@ -463,6 +463,10 @@ void CodeGenerator::genExpr(const ExprNode& expr, FuncContext& ctx){
     else if (const auto* e = std::get_if<FieldAccessExpr>(&expr.var)){
         genFieldAccess(*e, ctx);
     }
+
+    else if(const auto* e = std::get_if<ConsExpr>(&expr.var)){
+        genCons(*e, ctx);
+    }
 }
 
 
@@ -488,7 +492,7 @@ void CodeGenerator::genIdent(const IdentExpr& e, FuncContext& ctx){
 //Literals
 void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
     
-    if(const auto* v = std::get_if<long long>(&e.value)) genIntLiteral(*v);
+    if(const auto* v = std::get_if<int64_t>(&e.value)) genIntLiteral(*v);
 
     //будем представлять наши вещественные числа как последовательность байт, rax не будет знать, что в нем лежит float
     else if(const auto* v = std::get_if<double>(&e.value)) genFloatLiteral(*v);
@@ -507,7 +511,7 @@ void CodeGenerator::genLiteral(const LiteralExpr& e, FuncContext& ctx){
 }
 
 //вспомогательные
-void CodeGenerator::genIntLiteral(long long v){
+void CodeGenerator::genIntLiteral(int64_t v){
     emit("mov rax, " + std::to_string(v));
 }
 
@@ -1040,6 +1044,28 @@ void CodeGenerator::genNamedCtorFieldAccess(const FieldAccessExpr& e){
 
 
 
+//cons - {tag, head, tail}
+void CodeGenerator::genCons(const ConsExpr& e, FuncContext& ctx){
+
+    genExpr(*e.head, ctx); //head
+    int headOff = ctx.allocLocal("__cons_head");
+    emit("mov [rbp" + std::to_string(headOff) + "], rax");
+
+    genExpr(*e.tail, ctx); //tail
+    int tailOff = ctx.allocLocal("__cons_tail");
+    emit("mov [rbp" + std::to_string(tailOff) + "], rax");
+
+    emitAlloc(24);
+    emit("mov qword [rax], 1"); // tag = 1 (Cons)
+    emit("mov rcx, [rbp" + std::to_string(headOff) + "]");
+    emit("mov [rax + 8], rcx");
+    emit("mov rcx, [rbp" + std::to_string(tailOff) + "]");
+    emit("mov [rax + 16], rcx");
+
+    ctx.removeLocal("__cons_head");
+    ctx.removeLocal("__cons_tail");
+}
+
 //Patterns matching
 //match ???
 void CodeGenerator::genMatch(const MatchExpr& e, FuncContext& ctx){
@@ -1171,10 +1197,10 @@ void CodeGenerator::genLiteralPattern(const LiteralPatternNode& p,
 void CodeGenerator::genIntBoolLiteralPattern(const LiteralPatternNode& p, 
     const std::string& failLabel){
 
-        long long value = 0;
+        int64_t value = 0;
         if(p.value == "yep") value = 1;
         else if(p.value == "nope") value = 0; 
-        else value = std::stoll(p.value); //переводим лексему в число
+        else value = static_cast<int64_t>(std::stoll(p.value)); //переводим лексему в число
         emit("cmp rax, " + std::to_string(value));
         emit("jne " + failLabel);
 

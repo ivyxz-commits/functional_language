@@ -98,7 +98,7 @@ void printExpr(const Parser::ExprNode& node, int space){
 
     if(const auto* e = std::get_if<Parser::LiteralExpr>(&node.var)){
     
-        if(const auto* v = std::get_if<long long>(&e->value)){
+        if(const auto* v = std::get_if<int64_t>(&e->value)){
             std::cout << padding << "IntLit: " << *v << "\n";
         }
 
@@ -357,7 +357,7 @@ int main(int argc, char* argv[]){
 
     std::string asmCode = codegen.generate(prog);
 
-    std::string outFile = "output.asm";
+    std::string outFile = "output/output.asm";
     std::ofstream out(outFile);
     if(!out){
         std::cerr << "error: cannot open output file '" << outFile << "'\n";
