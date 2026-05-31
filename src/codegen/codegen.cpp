@@ -35,7 +35,7 @@ int CodeGenerator::getConstructorTag(const std::string& ctorName) const{
 
 //точка входа
 std::string CodeGenerator::generate(const Program& prog){
-    m_text.str(""); m_data.str(""); m_bss.str(""); //внутренняя строка пустая
+    m_text.str(""); m_data.str(""); m_bss.str(""); m_lambdas.str(""); //внутренняя строка пустая
 
     m_data << "section .data\n";
     m_data << "__div_zero_len: dq 16\n"; //метка длины 8 байт, значение 16 {length, data[]}
@@ -72,7 +72,7 @@ std::string CodeGenerator::generate(const Program& prog){
     m_text << "    mov rax, 60\n"; //syscall exit - код завершения в rdi
     m_text << "    syscall\n\n";
 
-    return m_data.str() + "\n" + m_bss.str() + "\n" + m_text.str();
+    return m_data.str() + "\n" + m_bss.str() + "\n" + m_text.str() + m_lambdas.str();
 }
 
 //utilities
@@ -82,6 +82,10 @@ std::string CodeGenerator::freshLabel(const std::string& label){
 
 std::string CodeGenerator::freshStrLabel(){
     return "__str_" + std::to_string(m_strCnt++);
+}
+
+std::string CodeGenerator::freshLambdaLabel(){
+    return "__lambda_" + std::to_string(m_labelCnt++);
 }
 
 void CodeGenerator::emit(const std::string& line){ //to section.text
@@ -846,13 +850,13 @@ void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
             return;
         }
 
-        if(genCallBuiltin(ident, e), true) return; //встроенная функция
-
         auto off = ctx.findLocal(ident.name);
         if(off){
             emit("mov rax, [rbp" + std::to_string(*off) + "]");
             genCallClosure(argOffsets); //ptr_lambda + captured_env
         }
+
+        if(genCallBuiltin(ident, e), true) return; //встроенная функция
 }
 
 
@@ -1451,7 +1455,7 @@ void CodeGenerator::scanExpr(const ExprNode& expr, const std::vector<std::string
 std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
     const std::vector<std::string>& captured, FuncContext& outer){ //с внешним контекстом
 
-    std::string funcLabel = freshLabel("lambda");
+    std::string funcLabel = freshLambdaLabel();
 
     std::ostringstream bodyStream; //сохранили основной поток, генерируем все во временный
     std::swap(m_text, bodyStream); //временный сейчас для нас m_text
@@ -1475,15 +1479,13 @@ std::string CodeGenerator::genLambdaFunc(const LambdaExpr& e,
 
     int stackSize = ctx.alignedStackSize();
     if(stackSize > 0){
-        emit("sub rsp, " + std::to_string(stackSize));
+        m_lambdas << "    sub rsp, " << stackSize << "\n";
     }
 
-    m_text << body; //весь текст обратно
-    emit("mov rsp, rbp");
-    emit("pop rbp");
-    emit("ret");
-    m_text << "\n";
-
+    m_lambdas << body; //весь текст обратно
+    m_lambdas << "    mov rsp, rbp\n";
+    m_lambdas << "    pop rbp\n";
+    m_lambdas << "    ret\n\n";
     return funcLabel;
 }
 

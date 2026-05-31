@@ -62,7 +62,28 @@ Pipeline из четырёх независимых фаз:
 cmake -B build && cmake --build build
 ```
 
-Собирается компилятор `lang` и `runtime_functions.o` - объектный файл со встроенными функциями времени выполнения (`print_float`, `parse_int`, `parse_float`, `str_eq`).
+Собирается компилятор `lang` и `runtime_functions.o` — объектный файл со встроенными функциями
+времени выполнения (`print_float`, `parse_int`, `parse_float`, `str_eq`).
+
+### Запуск программы
+```bash
+# скопировать пример в test.txt и запустить
+cp examples/palindrome.lang test.txt
+cmake --build build --target run
+```
+
+### Отладка
+```bash
+# вывод потока токенов
+cmake --build build --target dump-tokens
+
+# вывод AST
+cmake --build build --target dump-ast
+
+# сборка с отладочными символами (для gdb)
+cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
+gdb ./build/output/program
+```
 
 ### Запуск программы
 ```bash

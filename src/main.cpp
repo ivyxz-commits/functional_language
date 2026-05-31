@@ -196,6 +196,8 @@ void printExpr(const Parser::ExprNode& node, int space){
             std::cout << padding << "  bindings: " << b.name << "\n";
             printExpr(*b.value, space + 2); 
         }
+        std::cout << padding << "  body:\n";
+        printExpr(*e->body, space + 2);
     }
 
     else if(const auto* e = std::get_if<Parser::LambdaExpr>(&node.var)){

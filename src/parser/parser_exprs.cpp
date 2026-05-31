@@ -319,7 +319,6 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePostfix(){
 //primary ::= literal | IDENT | groupedExpr | tupleExpr | ListExpr | constructorExpr
 std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
     using TT = Lexer::TokenType;
-    auto pos = currentPos();
 
     if(check(TT::LIT_INT) || check(TT::LIT_REAL) || check(TT::LIT_STRING) 
     || check(TT::LIT_YEP) || check(TT::LIT_NOPE) || check(TT::KW_UNIT)){
@@ -333,14 +332,19 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
     return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
 }
 
-//x : xs || x : [2, 3, 4] => [x, 2, 3, 4]
+//x : xs || x : [2, 3, 4] => [x, 2, 3, 4] //правоассоциативен
 std::expected<Ptr<ExprNode>, ParseError> Parser::parseConsExpr(Ptr<ExprNode> head){
     using TT = Lexer::TokenType;
     auto pos = currentPos();
 
     advance();
-    auto tail = parseExpr(); 
-    if(!tail) return std::unexpected(tail.error());
+    auto tail = parseLogicalOr(); 
+    if(!tail) return std::unexpected(tail.error()); 
+    
+    if(check(TT::OP_COLON)){ //если видим еще cons
+        tail = parseConsExpr(std::move(*tail));
+        if(!tail) return std::unexpected(tail.error());
+    }
 
     ConsExpr ce{std::move(head), std::move(*tail), pos};
     return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
@@ -432,7 +436,7 @@ std::expected<LambdaParam, ParseError> Parser::parseLambdaParam(){
 
     std::optional<Ptr<TypeNode>> type;
     if(match(TT::OP_COLON)){ 
-        auto t = parseType();
+        auto t = parseAtomicType();
         if(!t) return std::unexpected(t.error());
         type = std::move(*t);
     }

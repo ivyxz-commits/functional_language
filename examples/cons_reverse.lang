@@ -1,0 +1,18 @@
+fn rev_accum(xs: [int64], acc: [int64]) -> [int64] =
+    match xs {
+        [] -> acc,
+        h : other -> rev_accum(other, h : acc)
+    }
+
+fn print_list(xs: [int64]) -> unit =
+    match xs {
+        [] -> unit,
+        h : other -> 
+            let _ = print(h) in
+            print_list(other)
+    }
+
+fn main() -> unit =
+    let xs = (1 : 2 : 3 : []) in
+    let rev = rev_accum(xs, 0 : []) in
+    print_list(rev)

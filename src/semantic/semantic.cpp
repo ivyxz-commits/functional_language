@@ -760,6 +760,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeExpr(
     else if(const auto* e = std::get_if<TupleExpr>(&expr.var)) result = analyzeTuple(*e, env, errors);
     else if(const auto* e = std::get_if<ListExpr>(&expr.var)) result = analyzeList(*e, env, errors);
     else if(const auto* e = std::get_if<ConstructorExpr>(&expr.var)) result = analyzeConstructor(*e, env, errors);
+    else if(const auto* e = std::get_if<ConsExpr>(&expr.var)) result = analyzeCons(*e, env, errors); 
 
     if(result && *result){
         m_exprTypes[&expr] = *result; //сохраняем тип
@@ -1370,6 +1371,11 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCons(
             errors.push_back(makeError(
                 "cons tail must be a list, got '" + (*tailType)->toString() + "'", e.pos));
             return std::nullopt;
+        }
+
+        auto* elemBuiltin = std::get_if<BuiltinType>(&listType->elem->var);
+        if(elemBuiltin && elemBuiltin->name == "unit"){
+            return makeList(*headType);
         }
 
         if(!typesCompatible(**headType, *listType -> elem)){

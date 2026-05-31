@@ -1,0 +1,13 @@
+fn apply(f: int64 -> int64, x: int64) -> int64 =
+    f(x)
+
+fn apply_twice(f: int64 -> int64, x: int64) -> int64 =
+    f(f(x))
+
+fn main() -> int64 =
+    let double = \x: int64 -> x * 2 in
+    let inc = \x: int64 -> x + 1 in
+    let r1 = apply(double, 5) in
+    let r2 = apply_twice(inc, 10) in
+    let _ = print(r1) in
+    print(r2)

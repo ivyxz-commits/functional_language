@@ -75,6 +75,7 @@ private:
     std::ostringstream m_text;
     std::ostringstream m_data;
     std::ostringstream m_bss;
+    std::ostringstream m_lambdas;
 
     //нужно выдерживать уникальность меток
     int m_labelCnt = 0; //в коде
@@ -90,6 +91,7 @@ private:
     //работа с метками
     std::string freshLabel(const std::string& label = "L"); //.L_0, .L_1, ...
     std::string freshStrLabel();
+    std::string freshLambdaLabel();
     void emit(const std::string& line);
     void emitData(const std::string& line);
     void emitLabel(const std::string& label); //метка

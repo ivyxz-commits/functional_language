@@ -29,10 +29,7 @@ cmake -B build && cmake --build build
 ## Запуск
 
 ```bash
-./build/lang program.lang
-nasm -f elf64 output/output.asm -o output/output.o
-gcc output/output.o build/runtime_functions.o -o output/program -nostartfiles -no-pie
-./output/program
+cmake --build build --target run
 ```
 
 
@@ -58,6 +55,9 @@ report.md - отчёт о проделанной работе
 ## Флаги
 
 ```bash
-./build/lang --dump-tokens program.lang #вывод потока токенов
-./build/lang --dump-ast program.lang #вывод AST дерева в терминале
+# вывод AST дерева в терминале
+cmake --build build --target dump-ast
+
+# вывод токенов  
+cmake --build build --target dump-tokens
 ```
