@@ -56,7 +56,6 @@ struct FunctionType{
     sPtr<TypeInfo> to;
 };
 
-// index() возвращние номера активного типа
 using TypeInfoVar = std::variant<
     BuiltinType,
     SimpleType,
@@ -198,7 +197,6 @@ private:
     void analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>& errors);
     ConstructorInfo buildConstructorInfo(const ConstructorDecl& ctor, const std::string& dataName,
     const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
-
 
 
     //разбор образцов(шаблонов) //образец хороший если он структурно совместим с типом сопоставляемого значения

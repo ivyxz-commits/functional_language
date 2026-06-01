@@ -16,6 +16,9 @@ add_custom_target(runtime_files DEPENDS
 
 add_executable(lang
     src/main.cpp
+    src/cli/options.cpp
+    src/debug/dump.cpp
+    src/pipeline.cpp
     src/lexer/lexer.cpp
     src/parser/parser_base.cpp
     src/parser/parser_decls.cpp
@@ -27,6 +30,8 @@ add_executable(lang
 
 target_include_directories(lang PRIVATE
     src
+    src/cli
+    src/debug
     src/lexer
     src/parser
     src/semantic

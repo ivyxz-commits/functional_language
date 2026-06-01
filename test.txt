@@ -1,7 +1,18 @@
-fn multiplier(factor: int64) -> (int64 -> int64) = 
-    \x: int64 -> x * factor
+//16. даны натуральные число n и вещественные числа, определить количество отрицательных 
+//и количество положительных вещественных чисел
 
-fn main() -> int64 = 
-    let triple = multiplier(3) in //указатель на структуру памяти
-    let result = triple(7) in
-    print(result)
+fn solve(xs: [float64], neg: int64, pos: int64) -> int64 =
+    match xs {
+        [] -> let _ = print(neg) in 
+              let _ = print(pos) in
+              0,
+        x : rest ->
+            if x < 0.0 
+                then solve(rest, neg + 1, pos)
+                else
+                    if x > 0.0 
+                        then solve(rest, neg, pos + 1)
+                        else solve(rest, neg, pos) //x = 0.0
+    }
+
+fn main() -> int64 = solve([35351.343, -253.4654, 33.3543, 6747.5760, -3674.34736476], 0, 0)

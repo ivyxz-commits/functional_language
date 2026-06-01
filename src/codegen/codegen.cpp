@@ -609,7 +609,7 @@ void CodeGenerator::genFloatOp(BinaryOp op){
         case BinaryOp::Mul: emit("mulsd xmm0, xmm1"); break;
         case BinaryOp::Div: 
             emit("xorpd xmm2, xmm2");
-            emit("uconisd xmm1, xmm2");
+            emit("ucomisd xmm1, xmm2");
             emit("jne .div_ok_" + std::to_string(m_labelCnt));
             emit("call __lang_panic");
             emit("mov rdi, __div_zero_len");
