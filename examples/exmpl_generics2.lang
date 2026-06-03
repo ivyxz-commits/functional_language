@@ -1,0 +1,10 @@
+data Box[T] = Box(T)
+
+fn unbox[T](b: Box[T]) -> T = 
+    match b {
+        Box(x) -> x
+    }
+
+fn main() -> int64 = 
+    let b = Box[int64](19) in
+    let x = unbox[int64](b) in print(x)

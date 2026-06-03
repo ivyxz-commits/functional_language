@@ -1510,6 +1510,8 @@ std::string CodeGenerator::mangleTypeName(const sPtr<TypeInfo>& type){
         return bt->name;
     }
 
+    //тут как раз и получаем int64, float64, bool, string
+
     if(const auto* st = std::get_if<SimpleType>(&type->var)){
         return st->name;
     }

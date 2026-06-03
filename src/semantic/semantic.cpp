@@ -1103,7 +1103,16 @@ sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
                 elems.push_back(changeTypeVars(*e, typeVarMap));
             return makeTuple(std::move(elems));
         }
-        return std::make_shared<TypeInfo>(type);
+
+        if(const auto* gt = std::get_if<GenericType>(&type.var)){
+            std::vector<sPtr<TypeInfo>> newArgs; //подставлени в аргументы дженерика типа
+            for(const auto& arg : gt->args){
+                newArgs.push_back(changeTypeVars(*arg, typeVarMap));
+            }
+            return makeGeneric(gt -> name, std::move(newArgs));
+        }
+
+        return std::make_shared<TypeInfo>(type); //для BuiltinType
 }
 
 
