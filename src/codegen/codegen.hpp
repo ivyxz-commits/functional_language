@@ -3,6 +3,7 @@
 #include "ast.hpp"
 #include "semantic.hpp"
 #include <sstream>
+#include <set> //уникальные элементы в отсортированном порядке
 
 namespace Codegen{
     
@@ -63,6 +64,7 @@ public:
     //для конструкторов в ADT 
     //пример в примере при match shape Circl -> tag = 0 - индекс конструктора в векторе dataTypeInfo::constructors
     CodeGenerator(const TypeRegistry& registry, const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes,
+        const std::unordered_map<const CallExpr*, std::unordered_map<std::string, sPtr<TypeInfo>>>& callTypeMaps,
         std::string filename = "<input>");
 
     //генерация полного .asm файла
@@ -75,12 +77,24 @@ private:
     std::ostringstream m_text;
     std::ostringstream m_data;
     std::ostringstream m_bss;
+
+    //так как до call можем не дойти - нужна последовательность верная 
+    //поэтому в конце, пока по call не прыгнем
     std::ostringstream m_lambdas;
+    std::ostringstream m_generics;
 
     //нужно выдерживать уникальность меток
     int m_labelCnt = 0; //в коде
     int m_strCnt = 0; // .data
     std::unordered_map<std::string, std::string> m_funcLabels; //add и __fn_add //тут лежит тело функции
+
+    //дженерики
+    std::unordered_map<std::string, const FuncDecl*> m_genericFuncs;
+    std::set<std::string> m_generatedInstances; //чтобы метки функций не повторялись
+    std::unordered_map<std::string, sPtr<TypeInfo>> m_currentTypeVarMap;
+    //+
+    const std::unordered_map<const CallExpr*, 
+    std::unordered_map<std::string, sPtr<TypeInfo>>>& m_callTypeMaps;
 
     const TypeRegistry& m_registry;
     const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes;
@@ -113,6 +127,12 @@ private:
     //Объявление функции со вспомогательной функцией
     void genFuncDecl(const FuncDecl& fn);
     void genFuncParams(const FuncDecl& fn, FuncContext& ctx);
+
+    //объявление функции с generic
+    void genGenericFuncDecl(const FuncDecl& fn, const std::string& label,
+        const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap);
+    //преобразование имени в уникальную строку - информация о типах
+    std::string mangleTypeName(const sPtr<TypeInfo>& type); 
 
     void genModuleDecl(const ModuleDecl& mod);
 

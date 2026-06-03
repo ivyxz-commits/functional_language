@@ -9,10 +9,19 @@
 
 namespace Codegen {
 
-CodeGenerator::CodeGenerator(const TypeRegistry& registry, 
-    const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& exprTypes, std::string filename)
 
-    :m_registry(registry), m_exprTypes(exprTypes), m_filename(std::move(filename)){}
+//конструктор класса
+CodeGenerator::CodeGenerator(const TypeRegistry& registry, 
+    const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& exprTypes, 
+    const std::unordered_map<const CallExpr*, 
+    std::unordered_map<std::string, sPtr<TypeInfo>>>& callTypeMaps,
+    std::string filename)
+
+    :m_registry(registry),
+    m_exprTypes(exprTypes), 
+    m_callTypeMaps(callTypeMaps),
+    m_filename(std::move(filename)){}
+
 
 
 //получение тега конструктора ADT
@@ -72,7 +81,7 @@ std::string CodeGenerator::generate(const Program& prog){
     m_text << "    mov rax, 60\n"; //syscall exit - код завершения в rdi
     m_text << "    syscall\n\n";
 
-    return m_data.str() + "\n" + m_bss.str() + "\n" + m_text.str() + m_lambdas.str();
+    return m_data.str() + "\n" + m_bss.str() + "\n" + m_text.str() + m_lambdas.str() + m_generics.str();
 }
 
 //utilities
@@ -130,6 +139,14 @@ void CodeGenerator::emitAlloc(int size){
 bool CodeGenerator::isFloatExpr(const ExprNode& e) const{
     auto it = m_exprTypes.find(&e);
     if(it == m_exprTypes.end()) return false;
+    
+    //для generic
+    auto type = it->second;
+    if(const auto* st = std::get_if<SimpleType>(&type->var)){ //только если st
+        auto it2 = m_currentTypeVarMap.find(st->name);
+        if(it2 != m_currentTypeVarMap.end()) type = it2 -> second;
+    }
+
     const auto *bt = std::get_if<BuiltinType>(&it->second->var);
     return bt && bt ->name == "float64";
 }
@@ -137,6 +154,14 @@ bool CodeGenerator::isFloatExpr(const ExprNode& e) const{
 bool CodeGenerator::isStringExpr(const ExprNode& e) const{
     auto it = m_exprTypes.find(&e);
     if(it == m_exprTypes.end()) return false;
+
+    //для generic
+    auto type = it->second;
+    if(const auto* st = std::get_if<SimpleType>(&type->var)){ //только если st
+        auto it2 = m_currentTypeVarMap.find(st->name);
+        if(it2 != m_currentTypeVarMap.end()) type = it2 -> second;
+    }
+    
     const auto *bt = std::get_if<BuiltinType>(&it->second->var);
     return bt && bt ->name == "string";
 }
@@ -329,11 +354,14 @@ void CodeGenerator::emitPrintInt(){
 //Declarations
 void CodeGenerator::genDecl(const DeclNode& decl){
     if(const auto* fn = std::get_if<FuncDecl>(&decl.var)){
-        genFuncDecl(*fn);
+        if(!fn->typeParams.empty()){
+            m_genericFuncs[fn->name] = fn; //gener -> decl функции
+        } else {   
+            genFuncDecl(*fn);
+        }
     } else if(const auto* mod = std::get_if<ModuleDecl>(&decl.var)){ 
         genModuleDecl(*mod);
     }
-
     //TypeAliasDecl и DataDecl - типы и кода не генерируют
 }
 
@@ -879,6 +907,31 @@ void CodeGenerator::genCallClosure(const std::vector<int>& argOffsets){
 //обрабатывает функцию по имени
 void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
     const std::vector<int>& argOffsets, FuncContext& ctx){ 
+
+        //дженерик функция?
+        if(m_genericFuncs.count(ident.name)){
+            auto it = m_callTypeMaps.find(&e);
+            if(it != m_callTypeMaps.end()){
+                auto& typeVarMap = it->second;
+
+                std::string suffix;
+                for(const auto& tp : m_genericFuncs[ident.name]->typeParams){
+
+                    auto tit = typeVarMap.find(tp);
+                    if(tit != typeVarMap.end())
+                        suffix += "_" + mangleTypeName(tit->second);
+                }
+
+                std::string label = "__fn_" + ident.name + suffix;
+                if(!m_generatedInstances.count(label)){
+                    m_generatedInstances.insert(label);
+                    genGenericFuncDecl(*m_genericFuncs[ident.name], label, typeVarMap);
+                }
+                emit("call " + label);
+                return;
+            }
+        }
+
 
         auto it = m_funcLabels.find(ident.name);
         if(it != m_funcLabels.end()){
@@ -1447,6 +1500,89 @@ void CodeGenerator::genLiteralPattern(const LiteralPatternNode& p,
             genStringLiteralPattern(p, failLabel);
         }
 }
+
+
+//вспомогательные функции для Generic
+
+//преобразование типа в уникальную строку
+std::string CodeGenerator::mangleTypeName(const sPtr<TypeInfo>& type){
+    if(const auto* bt = std::get_if<BuiltinType>(&type->var)){
+        return bt->name;
+    }
+
+    if(const auto* st = std::get_if<SimpleType>(&type->var)){
+        return st->name;
+    }
+
+    if(const auto* gt = std::get_if<GenericType>(&type->var)){
+        std::string s = gt->name; //"Option", [int64]
+        for(const auto& arg : gt->args) s += "_" + mangleTypeName(arg);
+        return s;
+    }
+
+    if(const auto* tt = std::get_if<TupleType>(&type->var)){
+        std::string s = "tuple";
+        for(const auto& e : tt->elems) s += "_" + mangleTypeName(e);
+        return s;
+    }
+
+    if(const auto* lt = std::get_if<ListType>(&type->var)){
+        return "list_" + mangleTypeName(lt->elem);
+    }
+
+    if(const auto* ft = std::get_if<FunctionType>(&type->var)){
+        return mangleTypeName(ft->from) + "_to_" + mangleTypeName(ft->to);
+    }
+    
+    return "unknown";
+}
+
+//создание уникальной метки - инстанцирование (мономорфизм)
+void CodeGenerator::genGenericFuncDecl(const FuncDecl& fn, const std::string& label,
+    const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap){
+
+    m_currentTypeVarMap = typeVarMap; //typeVar для float и string
+
+    FuncContext ctx;
+    ctx.name = fn.name;
+
+    std::ostringstream savedText;
+    std::swap(m_text, savedText);
+
+    emitLabel(label);
+    emit("push rbp");
+    emit("mov rbp, rsp");
+
+    std::ostringstream bodyStream;
+    std::swap(m_text, bodyStream);
+
+    //вспомогательные для genFunc()
+    genFuncParams(fn, ctx);
+    genExpr(*fn.body, ctx);
+
+    emit("mov rsp, rbp");
+    emit("pop rbp");
+    emit("ret");
+
+    std::string body = m_text.str();
+    std::swap(m_text, bodyStream);
+
+    int stackSize = ctx.alignedStackSize();
+    if(stackSize > 0){
+        emit("sub rsp, " + std::to_string(stackSize));
+    }
+    m_text << body;
+    m_text << "\n";
+
+    std::string funcCode = m_text.str();
+    std::swap(m_text, savedText);
+    m_generics << funcCode;
+
+    //сбрасываем typeVarMap
+    m_currentTypeVarMap.clear();
+}
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //вспомогательные для genLitPat()

@@ -280,9 +280,12 @@ CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: /home/ivan_su/project/src/codegen
   /usr/include/c++/13/bits/stl_iterator.h \
   /usr/include/c++/13/bits/stl_iterator_base_funcs.h \
   /usr/include/c++/13/bits/stl_iterator_base_types.h \
+  /usr/include/c++/13/bits/stl_multiset.h \
   /usr/include/c++/13/bits/stl_pair.h \
   /usr/include/c++/13/bits/stl_raw_storage_iter.h \
+  /usr/include/c++/13/bits/stl_set.h \
   /usr/include/c++/13/bits/stl_tempbuf.h \
+  /usr/include/c++/13/bits/stl_tree.h \
   /usr/include/c++/13/bits/stl_uninitialized.h \
   /usr/include/c++/13/bits/stl_vector.h \
   /usr/include/c++/13/bits/streambuf.tcc \
@@ -329,6 +332,7 @@ CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: /home/ivan_su/project/src/codegen
   /usr/include/c++/13/pstl/execution_defs.h \
   /usr/include/c++/13/pstl/glue_memory_defs.h \
   /usr/include/c++/13/pstl/pstl_config.h \
+  /usr/include/c++/13/set \
   /usr/include/c++/13/sstream \
   /usr/include/c++/13/stdexcept \
   /usr/include/c++/13/streambuf \
@@ -2454,9 +2458,12 @@ CMakeFiles/lang.dir/src/pipeline.cpp.o: /home/ivan_su/project/src/pipeline.cpp \
   /usr/include/c++/13/bits/stl_iterator.h \
   /usr/include/c++/13/bits/stl_iterator_base_funcs.h \
   /usr/include/c++/13/bits/stl_iterator_base_types.h \
+  /usr/include/c++/13/bits/stl_multiset.h \
   /usr/include/c++/13/bits/stl_pair.h \
   /usr/include/c++/13/bits/stl_raw_storage_iter.h \
+  /usr/include/c++/13/bits/stl_set.h \
   /usr/include/c++/13/bits/stl_tempbuf.h \
+  /usr/include/c++/13/bits/stl_tree.h \
   /usr/include/c++/13/bits/stl_uninitialized.h \
   /usr/include/c++/13/bits/stl_vector.h \
   /usr/include/c++/13/bits/streambuf.tcc \
@@ -2511,6 +2518,7 @@ CMakeFiles/lang.dir/src/pipeline.cpp.o: /home/ivan_su/project/src/pipeline.cpp \
   /usr/include/c++/13/pstl/execution_defs.h \
   /usr/include/c++/13/pstl/glue_memory_defs.h \
   /usr/include/c++/13/pstl/pstl_config.h \
+  /usr/include/c++/13/set \
   /usr/include/c++/13/span \
   /usr/include/c++/13/sstream \
   /usr/include/c++/13/stdexcept \
@@ -2945,8 +2953,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/c++/13/bits/locale_facets_nonio.tcc:
 
-/usr/include/c++/13/bits/codecvt.h:
-
 /usr/include/c++/13/array:
 
 /home/ivan_su/project/src/lexer/lexer.cpp:
@@ -2962,6 +2968,8 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/x86_64-linux-gnu/bits/uio_lim.h:
 
 /usr/include/x86_64-linux-gnu/bits/syscall.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdint-least.h:
 
 /usr/include/c++/13/limits:
 
@@ -3087,6 +3095,8 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/c++/13/bits/postypes.h:
 
+/usr/include/c++/13/bits/stl_multiset.h:
+
 /usr/include/c++/13/bits/exception_ptr.h:
 
 /usr/include/c++/13/bits/locale_conv.h:
@@ -3120,8 +3130,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/c++/13/bits/concept_check.h:
 
 /usr/include/c++/13/cerrno:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-least.h:
 
 /usr/include/c++/13/bits/exception.h:
 
@@ -3166,6 +3174,10 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
 
 /usr/include/c++/13/bits/hashtable_policy.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
+
+/usr/include/c++/13/bits/enable_special_members.h:
 
 /usr/include/c++/13/type_traits:
 
@@ -3278,8 +3290,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/c++/13/cstddef:
 
 /usr/include/x86_64-linux-gnu/bits/cpu-set.h:
-
-/usr/include/c++/13/bits/ostream_insert.h:
 
 /usr/include/c++/13/stdexcept:
 
@@ -3405,6 +3415,12 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/x86_64-linux-gnu/c++/13/bits/error_constants.h:
 
+/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
+
+/usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h:
+
 /usr/include/x86_64-linux-gnu/sys/cdefs.h:
 
 /usr/include/c++/13/cwchar:
@@ -3412,12 +3428,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/x86_64-linux-gnu/sys/select.h:
 
 /usr/include/unistd.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
-
-/usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
 
 /usr/include/x86_64-linux-gnu/sys/types.h:
 
@@ -3431,10 +3441,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/stdint.h:
 
-/usr/include/c++/13/bits/enable_special_members.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
-
 /usr/include/c++/13/bits/functexcept.h:
 
 /home/ivan_su/project/src/lexer/tokens.hpp:
@@ -3446,8 +3452,6 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/c++/13/backward/auto_ptr.h:
 
 /usr/include/c++/13/bits/erase_if.h:
-
-/usr/include/c++/13/bits/shared_ptr_atomic.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/error_t.h:
 
@@ -3467,6 +3471,14 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/c++/13/bits/shared_ptr_base.h:
 
+/usr/include/c++/13/bits/ostream_insert.h:
+
+/usr/include/c++/13/bits/stl_set.h:
+
+/usr/include/c++/13/bits/codecvt.h:
+
+/usr/include/c++/13/bits/stl_tree.h:
+
 /usr/include/c++/13/bits/new_allocator.h:
 
 /usr/include/c++/13/bits/stl_uninitialized.h:
@@ -3481,7 +3493,15 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 
 /usr/include/c++/13/variant:
 
+/usr/include/x86_64-linux-gnu/bits/posix_opt.h:
+
+/usr/include/c++/13/climits:
+
 /usr/include/c++/13/ext/concurrence.h:
+
+/usr/include/c++/13/bits/shared_ptr_atomic.h:
+
+/usr/include/c++/13/set:
 
 /usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
 
@@ -3504,7 +3524,3 @@ CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/seman
 /usr/include/x86_64-linux-gnu/asm/unistd.h:
 
 /usr/include/x86_64-linux-gnu/bits/getopt_core.h:
-
-/usr/include/c++/13/climits:
-
-/usr/include/x86_64-linux-gnu/bits/posix_opt.h:

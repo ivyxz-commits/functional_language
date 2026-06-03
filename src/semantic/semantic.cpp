@@ -996,6 +996,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
             if(symbol){ //получаем typeParams функции
                 auto typeVarMap = buildCallTypeVarMap(ident->name, e.typeArgs, env, errors);
                 if(!typeVarMap) return std::nullopt;
+                m_callTypeMaps[&e] = *typeVarMap; //сохраняем для кодогена
                 calleeType = changeTypeVars(**calleeType, *typeVarMap);
 
                 auto it = m_genericFuncDecls.find(ident -> name);

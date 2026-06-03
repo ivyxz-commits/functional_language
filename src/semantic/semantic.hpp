@@ -175,6 +175,11 @@ public:
         return m_genericFuncDecls;
     }
 
+    const std::unordered_map<const CallExpr*, 
+        std::unordered_map<std::string, sPtr<TypeInfo>>>& getCallTypeMaps() const {
+            return m_callTypeMaps;
+        }
+
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
@@ -182,7 +187,9 @@ private:
     std::unordered_map<std::string, sPtr<Environment>> m_moduleEnvs;
     std::unordered_map<std::string, std::vector<std::string>> m_funcTypeParams;
     std::unordered_map<std::string, const FuncDecl*> m_genericFuncDecls;
-
+    std::unordered_map<const CallExpr*, 
+    //хранит typeVarMap для каждого вызова дженерик функции, чтобы не переводить astnode -> typeinfo 
+    std::unordered_map<std::string, sPtr<TypeInfo>>> m_callTypeMaps; 
 
     //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
