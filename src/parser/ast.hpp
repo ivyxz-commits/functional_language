@@ -212,6 +212,7 @@ struct BinaryExpr{
 //ExprNode так как obj.method() //add(5)(10)
 struct CallExpr{ 
     Ptr<ExprNode> callee; //(\x -> x + 1)(5)
+    std::vector<Ptr<TypeNode>> typeArgs; //function[int64](5)
     std::vector<Ptr<ExprNode>> args;
     Pos pos;
 };
@@ -302,6 +303,7 @@ struct ListExpr{
 
 struct ConstructorExpr{ 
     std::string name;
+    std::vector<Ptr<TypeNode>> typeArgs; //Some[int64](5)
     std::vector<Ptr<ExprNode>> args;
     Pos pos;
 };
@@ -358,6 +360,7 @@ struct FuncParam{
 //fn name(params) -> returnType = expr
 struct FuncDecl{ 
     std::string name;
+    std::vector<std::string> typeParams;
     std::vector<FuncParam> params;
     Ptr<ExprNode> body;
     std::optional<Ptr<TypeNode>> returnType;

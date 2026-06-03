@@ -331,6 +331,8 @@ SemanticError Analyzer::makeError(std::string msg, Pos pos) const{
 //вспомогательные функции
 //функции проверки типов
 bool Analyzer::typesCompatible(const TypeInfo& a, const TypeInfo& b) const{
+    if(std::get_if<SimpleType>(&a.var)) return true; //T совместим с любым типом
+    if(std::get_if<SimpleType>(&b.var)) return true; //int64 совместим с T
     return a.equals(b);
 }
 
@@ -410,7 +412,9 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
             "function '" + fn.name + "' missing return type annotation", fn.pos)); //не указали тип
     }
 
-    auto rt = resolveType(**fn.returnType, {}, errors);
+    auto typeVarMap = buildTypeVarMap(fn.typeParams);
+
+    auto rt = resolveType(**fn.returnType, typeVarMap, errors);
     sPtr<TypeInfo> retType = rt ? *rt : makeBuiltin("unit"); //чтобы продолжили обрабатывать функцию
 
     sPtr<TypeInfo> funcType;
@@ -421,7 +425,7 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
         bool hasError = false;
 
         for(int i = static_cast<int>(fn.params.size()) - 1; i >= 0; i--){
-            auto paramType = resolveType(*fn.params[i].type, {}, errors);
+            auto paramType = resolveType(*fn.params[i].type, typeVarMap, errors);
             
             if(!paramType){ //если не разрешили тип
                 hasError = true; 
@@ -439,6 +443,10 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
             "function '" + fn.name + "' is already declared", fn.pos));
     }
 
+    if(!fn.typeParams.empty()){ //с отсутсвием параметров не записываем
+        m_funcTypeParams[fn.name] = fn.typeParams;
+        m_genericFuncDecls[fn.name] = &fn;
+    }
 }
 
 void Analyzer::firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
@@ -628,11 +636,11 @@ void Analyzer::analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vec
 void Analyzer::analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto funcEnv = std::make_shared<Environment>(env); 
 
-    //моя текущая реализация не поддерживает fn smth[a](x: a) -> a = x - у меня функция не параметризована типом
-    //std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap - она соотвественно будет пустой
+    //update теперь fn smth[a](x: a) -> a = x - у  - параметризирована типом
+    auto typeVarMap = buildTypeVarMap(fn.typeParams);
 
     for(const auto& param : fn.params){
-        auto paramType = resolveType(*param.type, {}, errors); //просто также пустоту передали, так как в таблице и так ничего не будет
+        auto paramType = resolveType(*param.type, typeVarMap, errors); //просто также пустоту передали, так как в таблице и так ничего не будет
         if(!paramType) continue; //ошибку уже добавили
 
         if(!funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos}))
@@ -657,7 +665,9 @@ void Analyzer::checkFuncBody(const FuncDecl& fn, sPtr<Environment> funcEnv, std:
     auto bodyType = analyzeExpr(*fn.body, funcEnv, errors);
     if(!bodyType) return;
 
-    auto expectedType = resolveType(**fn.returnType, {}, errors);
+    auto typeVarMap = buildTypeVarMap(fn.typeParams);
+
+    auto expectedType = resolveType(**fn.returnType, typeVarMap, errors);
     if(!expectedType) return;
 
     //своеобразный способ обработки print - без let _ = print() in 0
@@ -964,11 +974,138 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     
     //тип вызываемого add - add(1, 2)
     auto calleeType = analyzeExpr(*e.callee, env, errors); //из окружения получим Тип int64 -> int64 -> int64 
-
     if(!calleeType) return std::nullopt;
+
+
+    //Если дженерик без аргументов - ошибка
+    if(e.typeArgs.empty()){
+        if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+            if(m_funcTypeParams.count(ident->name)){
+                errors.push_back(makeError(
+                    "generic function '" + ident->name +
+                    "' requires explicit type arguments", e.pos));
+                return std::nullopt;
+            }
+        }
+    }
+
+    //для аргументов 
+    if(!e.typeArgs.empty()){
+        if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){ //ищем дженерик функцию в окружении
+            auto symbol = env->lookup(ident -> name);
+            if(symbol){ //получаем typeParams функции
+                auto typeVarMap = buildCallTypeVarMap(ident->name, e.typeArgs, env, errors);
+                if(!typeVarMap) return std::nullopt;
+                calleeType = changeTypeVars(**calleeType, *typeVarMap);
+
+                auto it = m_genericFuncDecls.find(ident -> name);
+                if(it != m_genericFuncDecls.end()){
+                    checkGenericFuncBody(*it->second, *typeVarMap, env, errors);
+                }
+            }
+        }
+    }
+
+    
 
     return analyzeCallArgs(e, *calleeType, env, errors);
 }
+
+
+//вспомогательные функции обработки generic`ов функции и ADT
+
+//обрабатотать тело после подстановки
+void Analyzer::checkGenericFuncBody(const FuncDecl& fn,
+    const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap, sPtr<Environment> env,
+    std::vector<SemanticError>& errors){
+
+        auto funcEnv = std::make_shared<Environment>(env);
+
+        for(const auto& param : fn.params){ //из параметра конкретный тип
+            auto paramType = resolveType(*param.type, typeVarMap, errors);
+            if(!paramType) continue; //x с типом int64, а не SimpleType("T")
+            funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos});
+        }
+
+        //сама функция
+        auto symbol = env->lookup(fn.name);
+        if(symbol) funcEnv->define(fn.name, *symbol);
+
+        auto bodyType = analyzeExpr(*fn.body, funcEnv, errors);
+        if(!bodyType) return;
+
+        //ожидаемый возвращамеый тип с подстановкой
+        auto expectedType = resolveType(**fn.returnType, typeVarMap, errors);
+        if(!expectedType) return;
+
+        if(!typesCompatible(**bodyType, **expectedType)){
+            errors.push_back(makeError(
+                "function '" + fn.name + "' body type '" +
+                (*bodyType)->toString() + "' does not match return type '" +
+                (*expectedType)->toString() + "' for type arguments", fn.pos));
+        }
+}
+
+//получить тип переменной
+std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>>
+    Analyzer::buildCallTypeVarMap(const std::string& funcName, 
+        const std::vector<Ptr<TypeNode>>& typeArgs, sPtr<Environment> env,
+        std::vector<SemanticError>& errors){ 
+            
+            auto it = m_funcTypeParams.find(funcName); //ищем typeParams функции
+            if(it == m_funcTypeParams.end()){
+                errors.push_back(makeError(
+                    "function '" + funcName + "' is not generic", {}));
+                return std::nullopt;
+            }
+
+            auto& typeParams = it->second;
+            if(typeParams.size() != typeArgs.size()){
+                errors.push_back(makeError(
+                    "wrong number of type arguments", {}));
+                return std::nullopt;
+            }
+
+            std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+            for(int i = 0; i < typeParams.size(); i++){
+                auto resolved = resolveType(*typeArgs[i], {}, errors); //в семантику переводим
+                if(!resolved) return std::nullopt;
+                typeVarMap[typeParams[i]] = *resolved; //кладем во временную таблицу T -> int64
+            }
+            
+            return typeVarMap;
+}
+
+//подставить полученный тип
+sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
+    const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap){
+
+        if(const auto* st = std::get_if<SimpleType>(&type.var)){ //может быть просто строка типа T
+            auto it = typeVarMap.find(st->name);
+            if(it != typeVarMap.end()) return it->second;
+            return std::make_shared<TypeInfo>(type);
+        }
+
+        if(const auto* ft = std::get_if<FunctionType>(&type.var)){
+            return makeFunction(
+                changeTypeVars(*ft->from, typeVarMap),
+                changeTypeVars(*ft->to, typeVarMap));
+        }
+
+        if(const auto* lt = std::get_if<ListType>(&type.var)){
+            return makeList(changeTypeVars(*lt->elem, typeVarMap));
+        }
+
+        if(const auto* tt = std::get_if<TupleType>(&type.var)){
+            std::vector<sPtr<TypeInfo>> elems;
+            for(const auto& e : tt->elems)
+                elems.push_back(changeTypeVars(*e, typeVarMap));
+            return makeTuple(std::move(elems));
+        }
+        return std::make_shared<TypeInfo>(type);
+}
+
+
 
 //вспомогательные функции analyzeCall()
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallPrint(const CallExpr& e, 
@@ -1289,11 +1426,53 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
     auto dataInfo = m_registry.lookupData(ctorInfo->dataName);
     bool isGeneric = dataInfo && !dataInfo -> typeParams.empty();
 
+    
     if(isGeneric){
-        for(int i = 0; i < e.args.size(); i++){  //тип определить не может, проверка на корректность аргументов выражения
-            analyzeExpr(*e.args[i], env, errors); //Some(1 + "hello")
+        if(e.typeArgs.empty()){
+            errors.push_back(makeError(
+                "generic constructor '" + e.name +
+                "' requires explicit type arguments, use " +
+                e.name + "[T](...)", e.pos));
+            return std::nullopt;
         }
-    } else {
+
+        if(e.typeArgs.size() != dataInfo->typeParams.size()){
+            errors.push_back(makeError(
+                "constructor '" + e.name + "' expects " +
+                std::to_string(dataInfo->typeParams.size()) +
+                " type argument(s), got " +
+                std::to_string(e.typeArgs.size()), e.pos));
+            return std::nullopt;
+        }
+
+        auto typeVarMap = buildTypeVarMap(dataInfo->typeParams); //временная таблица типов
+        for(int i = 0; i < (int)dataInfo->typeParams.size(); i++){
+            auto resolved = resolveType(*e.typeArgs[i], {}, errors);
+            if(!resolved) return std::nullopt;
+            typeVarMap[dataInfo->typeParams[i]] = *resolved;
+        }
+
+        for(std::size_t i = 0; i < e.args.size(); i++){
+            auto argType = analyzeExpr(*e.args[i], env, errors);
+            if(!argType) continue;
+
+            //проверка типа со значением
+            auto expectedType = changeTypeVars(*ctorInfo->fieldTypes[i], typeVarMap);
+            if(!typesCompatible(**argType, *expectedType)){
+                errors.push_back(makeError(
+                    "constructor '" + e.name + "' argument " +
+                    std::to_string(i + 1) + " has type '" +
+                    (*argType)->toString() + "', expected '" +
+                    expectedType->toString() + "'", e.pos));
+            }
+        }
+
+        std::vector<sPtr<TypeInfo>> resolvedArgs;
+        for(int i = 0; i < (int)dataInfo->typeParams.size(); i++){
+            resolvedArgs.push_back(typeVarMap[dataInfo->typeParams[i]]);
+        }
+        return makeGeneric(ctorInfo->dataName, std::move(resolvedArgs));
+    } else { //не generic
         checkConstructorArgs(e, *ctorInfo, env, errors);
     }
 
@@ -1569,6 +1748,7 @@ bool Analyzer::analyzeConsPattern(const ConsPatternNode& p, const sPtr<TypeInfo>
         return ok;
 }
 
+//теперь тоже поддерживает дженерики
 bool Analyzer::analyzeConstructorPattern(const ConstructorPatternNode& p, const sPtr<TypeInfo>& expectedType, 
     sPtr<Environment> env, std::vector<SemanticError>& errors){
 
@@ -1583,10 +1763,26 @@ bool Analyzer::analyzeConstructorPattern(const ConstructorPatternNode& p, const 
 
         if(!checkConstructorPatternArgCount(p, *ctorInfo, errors)) return false;
 
+        std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+
+        //к каждому параметру -> тип
+        auto dataInfo = m_registry.lookupData(ctorInfo->dataName);
+        if(dataInfo && !dataInfo->typeParams.empty()){
+            auto resolvedExpected = m_registry.resolveAlias(expectedType);
+            if(const auto* gt = std::get_if<GenericType>(&resolvedExpected->var)){
+                for(std::size_t i = 0; i < dataInfo->typeParams.size(); i++){
+                    typeVarMap[dataInfo->typeParams[i]] = gt->args[i];
+                }
+            }
+        }
+
         //Рекурсивно проверяем аргументы
         bool ok = true;
         for(std::size_t i = 0; i < p.args.size(); i++){
-            if(!analyzePattern(*p.args[i], ctorInfo->fieldTypes[i], env, errors)){
+            auto fieldType = typeVarMap.empty()
+                ? ctorInfo->fieldTypes[i]
+                : changeTypeVars(*ctorInfo->fieldTypes[i], typeVarMap);
+            if(!analyzePattern(*p.args[i], fieldType, env, errors)){
                 ok = false;
             }
         }

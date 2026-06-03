@@ -167,11 +167,22 @@ public:
         return m_exprTypes;  //поле типа для кодогена
     }
 
+    const std::unordered_map<std::string, std::vector<std::string>>& getFuncTypeParams() const{
+        return m_funcTypeParams;
+    }
+
+    const std::unordered_map<std::string, const FuncDecl*>& getGenericFuncDecls() const {
+        return m_genericFuncDecls;
+    }
+
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
     std::unordered_map<const ExprNode*, sPtr<TypeInfo>> m_exprTypes;
     std::unordered_map<std::string, sPtr<Environment>> m_moduleEnvs;
+    std::unordered_map<std::string, std::vector<std::string>> m_funcTypeParams;
+    std::unordered_map<std::string, const FuncDecl*> m_genericFuncDecls;
+
 
     //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
@@ -181,7 +192,7 @@ private:
 
     //разбор объявлений
 
-    using TypeVarMap = const std::unordered_map<std::string, sPtr<TypeInfo>>&; //псевдоним для упрощения визуального
+    using TypeVarMap = const std::unordered_map<std::string, sPtr<TypeInfo>>&; // for Generic
 
     void analyzeDecl(const DeclNode& decl, sPtr<Environment> env, std::vector<SemanticError>& errors);
 
@@ -320,6 +331,19 @@ private:
 
     std::optional<sPtr<TypeInfo>> analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
         sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+
+    //вспомогательные для generic
+    std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>>
+    buildCallTypeVarMap(const std::string& funcName, const std::vector<Ptr<TypeNode>>& typeArgs,
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    sPtr<TypeInfo> changeTypeVars(const TypeInfo& type,
+        const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap);
+
+    void checkGenericFuncBody(const FuncDecl& fn,
+    const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap, sPtr<Environment> env,
+    std::vector<SemanticError>& errors);
 
     ///////////////////////////////////////
     //LetIn

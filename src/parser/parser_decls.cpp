@@ -50,6 +50,9 @@ std::expected<FuncDecl, ParseError> Parser::parseFuncDecl(){
     auto nameTok = expect(TT::IDENT);
     if(!nameTok) return std::unexpected(nameTok.error());
     
+    auto typeParams = parseTypeParams(); //аналогично ADT - функция разбора обобщенного типа
+    if(!typeParams) return std::unexpected(typeParams.error());
+
     auto lp = expect(TT::DELIM_LPAREN);
     if(!lp) return std::unexpected(lp.error());
 
@@ -86,6 +89,7 @@ std::expected<FuncDecl, ParseError> Parser::parseFuncDecl(){
   
     return FuncDecl{ 
         std::move(nameTok -> lexeme),  //ну либо (*nameTok).lexeme - достали Token из expected 
+        std::move(*typeParams),
         std::move(params),
         std::move(*body),
         std::move(returnType),

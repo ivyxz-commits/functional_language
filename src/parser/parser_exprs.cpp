@@ -291,6 +291,23 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePostfix(){
 
     while(true){
 
+        std::vector<Ptr<TypeNode>> typeArgs;
+        if(check(TT::DELIM_LBRACKET)){
+            advance();
+            auto t = parseType();
+            if(!t) return std::unexpected(t.error());
+            typeArgs.push_back(std::move(*t));
+
+            while(match(TT::DELIM_COMMA)){
+                auto t = parseType();
+                if(!t) return std::unexpected(t.error());
+                typeArgs.push_back(std::move(*t));
+            }
+
+            auto rb = expect(TT::DELIM_RBRACKET);
+            if(!rb) return std::unexpected(rb.error());
+        }
+
         if(check(TT::DELIM_LPAREN)){
             auto pos = currentPos();
             advance();
@@ -299,7 +316,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePostfix(){
             auto rp  = expect(TT::DELIM_RPAREN);
             if(!rp) return std::unexpected(rp.error());
 
-            CallExpr ce{std::move(*expr), std::move(*args), pos};
+            CallExpr ce{std::move(*expr), std::move(typeArgs), std::move(*args), pos};
             *expr = std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
         } else if (check(TT::OP_DOT)){
             auto pos = currentPos();
@@ -520,6 +537,24 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
 
     bool isConstructor = !name.empty() && std::isupper(static_cast<unsigned char>(name[0]));
     if(isConstructor){ 
+
+        std::vector<Ptr<TypeNode>> typeArgs;
+        if(check(TT::DELIM_LBRACKET)){
+            advance();
+            auto t = parseType();
+            if(!t) return std::unexpected(t.error());
+            typeArgs.push_back(std::move(*t));
+
+            while(match(TT::DELIM_COMMA)){
+                auto t = parseType();
+                if(!t) return std::unexpected(t.error());
+                typeArgs.push_back(std::move(*t));
+            }
+
+            auto rb = expect(TT::DELIM_RBRACKET);
+            if(!rb) return std::unexpected(rb.error());
+        }
+
         std::vector<Ptr<ExprNode>> args;
         if(match(TT::DELIM_LPAREN)){ 
             auto arg = parseExpr();
@@ -534,7 +569,7 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
             auto rp = expect(TT::DELIM_RPAREN);
             if(!rp) return std::unexpected(rp.error());
         }
-        ConstructorExpr ce{std::move(name), std::move(args), pos};
+        ConstructorExpr ce{std::move(name), std::move(typeArgs), std::move(args), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
     }
 
