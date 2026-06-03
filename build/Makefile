@@ -194,6 +194,30 @@ clean_all/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/clean_all.dir/build.make CMakeFiles/clean_all.dir/build
 .PHONY : clean_all/fast
 
+src/cli/options.o: src/cli/options.cpp.o
+.PHONY : src/cli/options.o
+
+# target to build an object file
+src/cli/options.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/cli/options.cpp.o
+.PHONY : src/cli/options.cpp.o
+
+src/cli/options.i: src/cli/options.cpp.i
+.PHONY : src/cli/options.i
+
+# target to preprocess a source file
+src/cli/options.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/cli/options.cpp.i
+.PHONY : src/cli/options.cpp.i
+
+src/cli/options.s: src/cli/options.cpp.s
+.PHONY : src/cli/options.s
+
+# target to generate assembly for a file
+src/cli/options.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/cli/options.cpp.s
+.PHONY : src/cli/options.cpp.s
+
 src/codegen/codegen.o: src/codegen/codegen.cpp.o
 .PHONY : src/codegen/codegen.o
 
@@ -217,6 +241,30 @@ src/codegen/codegen.s: src/codegen/codegen.cpp.s
 src/codegen/codegen.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/codegen/codegen.cpp.s
 .PHONY : src/codegen/codegen.cpp.s
+
+src/debug/dump.o: src/debug/dump.cpp.o
+.PHONY : src/debug/dump.o
+
+# target to build an object file
+src/debug/dump.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/debug/dump.cpp.o
+.PHONY : src/debug/dump.cpp.o
+
+src/debug/dump.i: src/debug/dump.cpp.i
+.PHONY : src/debug/dump.i
+
+# target to preprocess a source file
+src/debug/dump.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/debug/dump.cpp.i
+.PHONY : src/debug/dump.cpp.i
+
+src/debug/dump.s: src/debug/dump.cpp.s
+.PHONY : src/debug/dump.s
+
+# target to generate assembly for a file
+src/debug/dump.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/debug/dump.cpp.s
+.PHONY : src/debug/dump.cpp.s
 
 src/lexer/lexer.o: src/lexer/lexer.cpp.o
 .PHONY : src/lexer/lexer.o
@@ -386,6 +434,30 @@ src/parser/parser_types.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/parser/parser_types.cpp.s
 .PHONY : src/parser/parser_types.cpp.s
 
+src/pipeline.o: src/pipeline.cpp.o
+.PHONY : src/pipeline.o
+
+# target to build an object file
+src/pipeline.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/pipeline.cpp.o
+.PHONY : src/pipeline.cpp.o
+
+src/pipeline.i: src/pipeline.cpp.i
+.PHONY : src/pipeline.i
+
+# target to preprocess a source file
+src/pipeline.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/pipeline.cpp.i
+.PHONY : src/pipeline.cpp.i
+
+src/pipeline.s: src/pipeline.cpp.s
+.PHONY : src/pipeline.s
+
+# target to generate assembly for a file
+src/pipeline.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/src/pipeline.cpp.s
+.PHONY : src/pipeline.cpp.s
+
 src/semantic/semantic.o: src/semantic/semantic.cpp.o
 .PHONY : src/semantic/semantic.o
 
@@ -424,9 +496,15 @@ help:
 	@echo "... run"
 	@echo "... runtime_files"
 	@echo "... lang"
+	@echo "... src/cli/options.o"
+	@echo "... src/cli/options.i"
+	@echo "... src/cli/options.s"
 	@echo "... src/codegen/codegen.o"
 	@echo "... src/codegen/codegen.i"
 	@echo "... src/codegen/codegen.s"
+	@echo "... src/debug/dump.o"
+	@echo "... src/debug/dump.i"
+	@echo "... src/debug/dump.s"
 	@echo "... src/lexer/lexer.o"
 	@echo "... src/lexer/lexer.i"
 	@echo "... src/lexer/lexer.s"
@@ -448,6 +526,9 @@ help:
 	@echo "... src/parser/parser_types.o"
 	@echo "... src/parser/parser_types.i"
 	@echo "... src/parser/parser_types.s"
+	@echo "... src/pipeline.o"
+	@echo "... src/pipeline.i"
+	@echo "... src/pipeline.s"
 	@echo "... src/semantic/semantic.o"
 	@echo "... src/semantic/semantic.i"
 	@echo "... src/semantic/semantic.s"

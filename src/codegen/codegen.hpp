@@ -118,7 +118,7 @@ private:
 
     //expressions - rax
     void genExpr(const ExprNode& expr, FuncContext& ctx);
-    void genIdent(const IdentExpr& e, FuncContext& ctx);
+    void genIdent(const IdentExpr& e,const ExprNode& node, FuncContext& ctx);
     void genUnary(const UnaryExpr& e, FuncContext& ctx);
     void genIf(const IfExpr& e, FuncContext& ctx);
     void genMatch(const MatchExpr& e, FuncContext& ctx);
@@ -150,7 +150,7 @@ private:
     void genNamedCtorFieldAccess(const FieldAccessExpr& e);
 
     ///////////////////////////////////////////////////////////////////////////////
-    void genCall(const CallExpr& e, FuncContext& ctx);
+    void genCall(const CallExpr& e, const ExprNode& node, FuncContext& ctx);
     //вспомогательные
     void genCallBuiltin(const IdentExpr& ident, const CallExpr& e);
     void genCallClosure(const std::vector<int>& argOffsets);

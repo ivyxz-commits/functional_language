@@ -1,0 +1,4 @@
+fn add(x: int64, y: int64) -> int64 = x + y
+
+fn main() -> int64 = 
+    let result = add(5)(10) in print(result)

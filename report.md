@@ -61,6 +61,11 @@ Pipeline из четырёх независимых фаз:
 ```bash
 cmake -B build && cmake --build build
 ```
+возможна быстрая запись без ручного копирования:
+```bash
+cp examples/partial_apply.lang test.txt && 
+cmake --build build --target run
+```
 
 Собирается компилятор `lang` и `runtime_functions.o` — объектный файл со встроенными функциями
 времени выполнения (`print_float`, `parse_int`, `parse_float`, `str_eq`).

@@ -1,4 +1,4 @@
 #pragma once
 #include "cli/options.hpp"
 
-int runPipeline(const CLIOptions opts);
+int runPipeline(const CLIOptions& opts);

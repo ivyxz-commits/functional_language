@@ -1020,6 +1020,15 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<
 
         auto currentType = calleeType; //передаем имя вызываемой функции
 
+        //если функция без параметров (unit -> x)
+        auto* ft0 = std::get_if<FunctionType>(&currentType->var);
+        if(ft0 && e.args.empty()){
+            auto* fromBt = std::get_if<BuiltinType>(&ft0->from->var);
+            if(fromBt && fromBt->name == "unit"){
+                currentType = ft0->to;
+            }
+        }
+
         //каждый аргумент вызываемой функции сопоставляется с полностью прописанной версией функции
         for(const auto& arg : e.args){ //каждый аргумент || x: int64, flag: bool smth(50, nope)
             auto* funcType = std::get_if<FunctionType>(&currentType->var); //functype = makeFunction(int64, makeFunct(int64, int64))
