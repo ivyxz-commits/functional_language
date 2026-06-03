@@ -1044,6 +1044,14 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<
             currentType = funcType->to;
         }
 
+        //каррирование <-> частичное применение
+        if(std::get_if<FunctionType>(&currentType->var) && e.args.size() > 1){
+            errors.push_back(makeError(
+                "partial application allows only one argument at a time, "
+                "use style f(a)(b) isntead of f(a, b)", e.pos));
+            return std::nullopt;
+        }
+
         return currentType;
 }
 

@@ -209,7 +209,7 @@ struct BinaryExpr{
     Pos pos;
 };
 
-//ExprNode так как obj.method()
+//ExprNode так как obj.method() //add(5)(10)
 struct CallExpr{ 
     Ptr<ExprNode> callee; //(\x -> x + 1)(5)
     std::vector<Ptr<ExprNode>> args;

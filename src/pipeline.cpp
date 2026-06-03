@@ -22,7 +22,7 @@ int runPipeline(const CLIOptions& opts){
     std::string source = buf.str(); //копируем все из буфера в строку
 
 
-    //лексер
+    //Лексер
     Lexer::Lexer lexer(source, opts.filename);
 
     auto lexResult = lexer.tokenize(); //указатель на вектор токенов
@@ -37,7 +37,7 @@ int runPipeline(const CLIOptions& opts){
 
     if(lexResult.hasErrors()) return 1;
 
-    //теперь парсер
+    //Парсер
     Parser::Parser parser(std::move(lexResult.tokens), opts.filename);
     auto progResult = parser.parse();
 
@@ -54,7 +54,6 @@ int runPipeline(const CLIOptions& opts){
     }
 
     //Семантика 
-
     Semantic::Analyzer analyzer(opts.filename);
     auto errors = analyzer.analyze(prog);
 
@@ -65,6 +64,8 @@ int runPipeline(const CLIOptions& opts){
         return 1;
     }
 
+    
+    //Кодоген
     Codegen::CodeGenerator codegen(
         analyzer.get_registry(),
         analyzer.getExprTypes(), opts.filename);
@@ -85,5 +86,4 @@ int runPipeline(const CLIOptions& opts){
     std::cout << "generated: " << outFile << "\n";
 
     return 0;
-
 }

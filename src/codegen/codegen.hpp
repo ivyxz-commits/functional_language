@@ -158,6 +158,16 @@ private:
         const std::vector<int>& argOffsets, FuncContext& ctx); 
 
 
+    ///////////////////////////////////////////////////////////////////////////////
+     void genPartialApply(const CallExpr& e, const std::vector<int>&
+        argOffsets, FuncContext& ctx);
+
+    //вспомогательные
+    bool isPartialCall(const ExprNode& e);
+    std::string getCalleeFuncLabel(const CallExpr& e, FuncContext& ctx); //label оригинальной функции
+    std::string genPartialWrapLambda(const std::string& funcLabel, int capturedCount);
+    void genPartialClosure(const std::string& wrapLabel, const std::string& funcLabel,
+        const std::vector<int>& argOffsets, FuncContext& ctx); //code_ptr - лямбда обертки и захваченные аргументы 
 
 
     //patterns matching
