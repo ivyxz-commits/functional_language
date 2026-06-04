@@ -339,8 +339,10 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
         sPtr<Environment> env, std::vector<SemanticError>& errors);
 
+    /*
+    *вспомогательные для generic
+    */
 
-    //вспомогательные для generic
     std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>>
     buildCallTypeVarMap(const std::string& funcName, const std::vector<Ptr<TypeNode>>& typeArgs,
         sPtr<Environment> env, std::vector<SemanticError>& errors);
@@ -349,8 +351,30 @@ private:
         const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap);
 
     void checkGenericFuncBody(const FuncDecl& fn,
-    const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap, sPtr<Environment> env,
-    std::vector<SemanticError>& errors);
+        const std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap, sPtr<Environment> env,
+        std::vector<SemanticError>& errors);
+
+    /*
+    *вспомогательные для A.3.4 generic - унификация
+    */
+
+    //сопоставляет типы рекурсивно
+    void unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
+        std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
+        std::vector<SemanticError>& errors, const Pos& pos);
+    
+    bool infCycleIn(const std::string& typeVar, sPtr<TypeInfo> type);
+
+    //вывод всех параметров
+    std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> 
+        inferenceTypeArgs(const std::string& funcName, const CallExpr& e, 
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    //для конструктора, для функций логика другая
+    std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> inferenceConstructorTypeArgs(
+        const ConstructorExpr& e, const std::optional<DataTypeInfo>& dataInfo, 
+        const std::optional<ConstructorInfo>& ctorInfo, sPtr<Environment> env, 
+        std::vector<SemanticError>& errors);
 
     ///////////////////////////////////////
     //LetIn

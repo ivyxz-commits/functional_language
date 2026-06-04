@@ -981,10 +981,11 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     if(e.typeArgs.empty()){
         if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
             if(m_funcTypeParams.count(ident->name)){
-                errors.push_back(makeError(
-                    "generic function '" + ident->name +
-                    "' requires explicit type arguments", e.pos));
-                return std::nullopt;
+                auto typeVarMap = inferenceTypeArgs(ident->name, e, env, errors);
+                if(!typeVarMap) return std::nullopt;
+                m_callTypeMaps[&e] = *typeVarMap;
+                calleeType = changeTypeVars(**calleeType, *typeVarMap); //вставляем все разрешенные типы
+                checkGenericFuncBody(*m_genericFuncDecls[ident->name], *typeVarMap, env, errors);
             }
         }
     }
@@ -1116,6 +1117,171 @@ sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
 }
 
 
+//Унификация generic`ов 
+
+//для function и ADT
+void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
+    std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
+    std::vector<SemanticError>& errors, const Pos& pos){
+
+        if(const auto* st = std::get_if<SimpleType>(&param->var)){
+            auto it = typeVarMap.find(st->name);
+
+            if(it != typeVarMap.end()){
+                
+                //если получали T уже для одного аругмента и он повторяется x: T
+                auto* bt1 = std::get_if<BuiltinType>(&it->second->var);
+                auto* bt2 = std::get_if<BuiltinType>(&arg->var);
+
+                //приведение типов int64 -> float64 будет допустимо
+                if(bt1 && bt2 && bt1->name == "int64" && bt2->name == "float64"){
+                    typeVarMap[st->name] = arg;
+                } else if(!typesCompatible(*it->second, *arg)){
+                    errors.push_back(makeError(
+                        "conflicting types for '" + st->name + "': '" +
+                        it->second->toString() + "' and '" +
+                        arg->toString() + "'", pos));
+                }
+            } else {
+                if(infCycleIn(st->name, arg)){
+                    errors.push_back(makeError(
+                        "infinite type: '" + st->name +
+                        "' occurs in '" + arg->toString() + "'", pos));
+                    return;
+                }
+                typeVarMap[st->name] = arg;
+            }
+            return;
+        }
+
+        //FuncType: T -> U + int64 -> string
+        if(const auto* fp = std::get_if<FunctionType>(&param->var)){
+            if(const auto* fa = std::get_if<FunctionType>(&arg->var)){
+                unify(fp->from, fa->from, typeVarMap, errors, pos);
+                unify(fp->to, fa->to, typeVarMap, errors, pos);
+            }
+            return;
+        }
+
+        // GenericType: Box[T] + Box[int64]
+        if(const auto* gp = std::get_if<GenericType>(&param->var)){
+            if(const auto* ga = std::get_if<GenericType>(&arg->var)){
+                if(gp->name == ga->name && gp->args.size() == ga->args.size()){
+                    for(std::size_t i = 0; i < gp->args.size(); i++)
+                        unify(gp->args[i], ga->args[i], typeVarMap, errors, pos);
+                }
+            }
+            return;
+        }
+
+        // ListType: [T] + [int64]
+        if(const auto* lp = std::get_if<ListType>(&param->var)){
+            if(const auto* la = std::get_if<ListType>(&arg->var)){
+                unify(lp->elem, la->elem, typeVarMap, errors, pos);
+            }
+            return;
+        }
+
+        // TupleType: (T, U) + (int64, string)
+        if(const auto* tp = std::get_if<TupleType>(&param->var)){
+            if(const auto* ta = std::get_if<TupleType>(&arg->var)){
+                if(tp->elems.size() == ta->elems.size()){
+                    for(int i = 0; i < (int)tp->elems.size(); i++)
+                        unify(tp->elems[i], ta->elems[i], typeVarMap, errors, pos);
+                }
+            }
+            return;
+        }
+
+}
+    
+bool Analyzer::infCycleIn(const std::string& typeVar, sPtr<TypeInfo> type){
+
+    if(const auto* st = std::get_if<SimpleType>(&type->var))
+        return st->name == typeVar;
+
+    if(const auto* ft = std::get_if<FunctionType>(&type->var))
+        return infCycleIn(typeVar, ft->from) || infCycleIn(typeVar, ft->to);
+
+    if(const auto* gt = std::get_if<GenericType>(&type->var)){
+        for(const auto& arg : gt->args)
+            if(infCycleIn(typeVar, arg)) return true;
+        return false;
+    }
+
+    //T = List[T] changeVarMap - рекурсивно зациклимся
+    if(const auto* lt = std::get_if<ListType>(&type->var))
+        return infCycleIn(typeVar, lt->elem);
+
+    //как и у generic все аргументы проверяем
+    if(const auto* tt = std::get_if<TupleType>(&type->var)){
+        for(const auto& e : tt->elems)
+            if(infCycleIn(typeVar, e)) return true;
+        return false;
+    }
+
+    return false; //если BuiltinType
+}
+
+//выведение параметров
+std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> 
+    Analyzer::inferenceTypeArgs(const std::string& funcName, const CallExpr& e,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        auto& typeParams = m_funcTypeParams[funcName];
+        auto& fn = *m_genericFuncDecls[funcName];
+        auto fnTypeVarMap = buildTypeVarMap(fn.typeParams);
+        std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+
+        for(std::size_t i = 0; i < e.args.size() && i < fn.params.size(); i++){
+            auto paramType = resolveType(*fn.params[i].type, fnTypeVarMap, errors); //SimpleType, Gener, ...
+            if(!paramType) return std::nullopt;
+
+            auto argType = analyzeExpr(*e.args[i], env, errors); //int64, string, ListType, ...
+            if(!argType) return std::nullopt;
+            unify(*paramType, *argType, typeVarMap, errors, e.pos); //создаем typeVarMap
+        }
+
+        // проверяем что все typeParams выведены
+        for(const auto& tp : typeParams){
+            if(!typeVarMap.count(tp)){
+                errors.push_back(makeError(
+                    "can`t inference type argument '" + tp +
+                    "' for function '" + funcName + "'", e.pos));
+                return std::nullopt;
+            }
+        }
+
+        return typeVarMap;
+}
+
+std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> Analyzer::inferenceConstructorTypeArgs(
+    const ConstructorExpr& e, const std::optional<DataTypeInfo>& dataInfo, 
+    const std::optional<ConstructorInfo>& ctorInfo, sPtr<Environment> env, 
+    std::vector<SemanticError>& errors){
+
+    auto fnTypeVarMap = buildTypeVarMap(dataInfo->typeParams);
+    std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+
+    for(std::size_t i = 0; i < e.args.size() && i < ctorInfo->fieldTypes.size(); i++){
+
+        auto fieldType = ctorInfo->fieldTypes[i]; //тип поля конструктора
+
+        auto argType = analyzeExpr(*e.args[i], env, errors); //тип аргумента
+        if(!argType) return std::nullopt;
+        unify(fieldType, *argType, typeVarMap, errors, e.pos);
+    }
+
+    for(const auto& tp : dataInfo->typeParams){ //проверка - все параметры выведены
+        if(!typeVarMap.count(tp)){
+            errors.push_back(makeError(
+                "can't infer type argument '" + tp +
+                "' for constructor '" + e.name + "'", e.pos));
+            return std::nullopt;
+        }
+    }
+    return typeVarMap;
+}
 
 //вспомогательные функции analyzeCall()
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallPrint(const CallExpr& e, 
@@ -1438,28 +1604,30 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
 
     
     if(isGeneric){
+        std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
+
+        //неявные типы
         if(e.typeArgs.empty()){
-            errors.push_back(makeError(
-                "generic constructor '" + e.name +
-                "' requires explicit type arguments, use " +
-                e.name + "[T](...)", e.pos));
-            return std::nullopt;
-        }
+            auto inferred = inferenceConstructorTypeArgs(e, dataInfo, ctorInfo, env, errors);
+            if(!inferred) return std::nullopt;
+            typeVarMap = *inferred;
+        } else {
 
-        if(e.typeArgs.size() != dataInfo->typeParams.size()){
-            errors.push_back(makeError(
-                "constructor '" + e.name + "' expects " +
-                std::to_string(dataInfo->typeParams.size()) +
-                " type argument(s), got " +
-                std::to_string(e.typeArgs.size()), e.pos));
-            return std::nullopt;
-        }
+            if(e.typeArgs.size() != dataInfo->typeParams.size()){
+                errors.push_back(makeError(
+                    "constructor '" + e.name + "' expects " +
+                    std::to_string(dataInfo->typeParams.size()) +
+                    " type argument(s), got " +
+                    std::to_string(e.typeArgs.size()), e.pos));
+                return std::nullopt;
+            }
 
-        auto typeVarMap = buildTypeVarMap(dataInfo->typeParams); //временная таблица типов
-        for(int i = 0; i < (int)dataInfo->typeParams.size(); i++){
-            auto resolved = resolveType(*e.typeArgs[i], {}, errors);
-            if(!resolved) return std::nullopt;
-            typeVarMap[dataInfo->typeParams[i]] = *resolved;
+            typeVarMap = buildTypeVarMap(dataInfo->typeParams); //временная таблица типов
+            for(std::size_t i = 0; i < dataInfo->typeParams.size(); i++){
+                auto resolved = resolveType(*e.typeArgs[i], {}, errors);
+                if(!resolved) return std::nullopt;
+                typeVarMap[dataInfo->typeParams[i]] = *resolved;
+            }
         }
 
         for(std::size_t i = 0; i < e.args.size(); i++){
@@ -1478,7 +1646,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
         }
 
         std::vector<sPtr<TypeInfo>> resolvedArgs;
-        for(int i = 0; i < (int)dataInfo->typeParams.size(); i++){
+        for(std::size_t i = 0; i < dataInfo->typeParams.size(); i++){
             resolvedArgs.push_back(typeVarMap[dataInfo->typeParams[i]]);
         }
         return makeGeneric(ctorInfo->dataName, std::move(resolvedArgs));
