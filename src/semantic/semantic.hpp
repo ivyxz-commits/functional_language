@@ -362,8 +362,6 @@ private:
     void unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
         std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
         std::vector<SemanticError>& errors, const Pos& pos);
-    
-    bool infCycleIn(const std::string& typeVar, sPtr<TypeInfo> type);
 
     //вывод всех параметров
     std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> 

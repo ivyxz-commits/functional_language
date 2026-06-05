@@ -1154,12 +1154,6 @@ void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
                         arg->toString() + "'", pos));
                 }
             } else {
-                if(infCycleIn(st->name, arg)){
-                    errors.push_back(makeError(
-                        "infinite type: '" + st->name +
-                        "' occurs in '" + arg->toString() + "'", pos));
-                    return;
-                }
                 typeVarMap[st->name] = arg;
             }
             return;
@@ -1204,34 +1198,6 @@ void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
             return;
         }
 
-}
-    
-bool Analyzer::infCycleIn(const std::string& typeVar, sPtr<TypeInfo> type){
-
-    if(const auto* st = std::get_if<SimpleType>(&type->var))
-        return st->name == typeVar;
-
-    if(const auto* ft = std::get_if<FunctionType>(&type->var))
-        return infCycleIn(typeVar, ft->from) || infCycleIn(typeVar, ft->to);
-
-    if(const auto* gt = std::get_if<GenericType>(&type->var)){
-        for(const auto& arg : gt->args)
-            if(infCycleIn(typeVar, arg)) return true;
-        return false;
-    }
-
-    //T = List[T] changeVarMap - рекурсивно зациклимся
-    if(const auto* lt = std::get_if<ListType>(&type->var))
-        return infCycleIn(typeVar, lt->elem);
-
-    //как и у generic все аргументы проверяем
-    if(const auto* tt = std::get_if<TupleType>(&type->var)){
-        for(const auto& e : tt->elems)
-            if(infCycleIn(typeVar, e)) return true;
-        return false;
-    }
-
-    return false; //если BuiltinType
 }
 
 //выведение параметров
