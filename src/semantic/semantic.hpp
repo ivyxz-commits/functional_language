@@ -180,6 +180,10 @@ public:
             return m_callTypeMaps;
         }
 
+    const std::unordered_map<const CallExpr*, const FuncDecl*>& getResolvedOverloads() const {
+        return m_resolvedOverloads;
+    }
+
 private:
     std::string m_filename;
     TypeRegistry m_registry; //объект реестра типов
@@ -190,6 +194,9 @@ private:
     std::unordered_map<const CallExpr*, 
     //хранит typeVarMap для каждого вызова дженерик функции, чтобы не переводить astnode -> typeinfo 
     std::unordered_map<std::string, sPtr<TypeInfo>>> m_callTypeMaps; 
+    //перегрузка функций
+    std::unordered_map<std::string, std::vector<const FuncDecl*>> m_overloads;
+    std::unordered_map<const CallExpr*, const FuncDecl*> m_resolvedOverloads;
 
     //Создание ошибки
     SemanticError makeError(std::string msg, Pos pos) const;
@@ -206,6 +213,11 @@ private:
     //анализация функции и ее тела
     void analyzeFuncDecl(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
     void checkFuncBody(const FuncDecl& fn, sPtr<Environment> funcEnv, std::vector<SemanticError>& errors);
+
+    //выбрать нужную перегрузку по типам аргументов
+    const FuncDecl* resolveOverload(const std::string& name, 
+    const std::vector<sPtr<TypeInfo>>& argTypes, 
+    std::vector<SemanticError>& errors, const Pos& pos);
 
     void analyzeModuleDecl(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
 

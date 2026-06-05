@@ -446,16 +446,83 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
         if(hasError) funcType = makeBuiltin("unit");
     }
 
-    if(!env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos})){
+    m_overloads[fn.name].push_back(&fn);
+
+    auto& overloads = m_overloads[fn.name]; //проверка на дубликат
+    for(std::size_t i = 0; i < overloads.size() - 1; i++){
+
+        const FuncDecl* other = overloads[i];
+        if(other->params.size() == fn.params.size()){ //сравнение типов параметров
+            bool same = true;
+
+            for(std::size_t j = 0; j < fn.params.size(); j++){
+                auto t1 = resolveType(*fn.params[j].type, typeVarMap, errors);
+                auto t2 = resolveType(*other->params[j].type, typeVarMap, errors);
+                if(!t1 || !t2 || !(*t1)->equals(**t2)){
+                    same = false; break; 
+                }
+            }
+
+            if(same){
+                errors.push_back(makeError(
+                    "function '" + fn.name + "' with same parameter types is already declared", fn.pos));
+                return;
+            }
+        }
+    }
+
+    // в окружение уже с модифицированным именем
+    std::string mangledName = fn.name;
+    for(const auto& p : fn.params){
+        auto pt = resolveType(*p.type, typeVarMap, errors);
+        if(pt) mangledName += "_" + (*pt)->toString();
+    }
+
+    if(!env->define(mangledName, Symbol{mangledName, funcType, false, fn.pos})){
         errors.push_back(makeError(
             "function '" + fn.name + "' is already declared", fn.pos));
     }
+
+    if(overloads.size() == 1){ //первая перегрузка
+        env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos});
+    }
+
 
     if(!fn.typeParams.empty()){ //с отсутсвием параметров не записываем
         m_funcTypeParams[fn.name] = fn.typeParams;
         m_genericFuncDecls[fn.name] = &fn;
     }
 }
+
+//выбор нужной перегрузки
+const FuncDecl* Analyzer::resolveOverload(const std::string& name,
+    const std::vector<sPtr<TypeInfo>>& argTypes,
+    std::vector<SemanticError>& errors, const Pos& pos){
+
+    auto it = m_overloads.find(name);
+    if(it == m_overloads.end()) return nullptr;
+
+    for(const FuncDecl* fn : it->second){ //точное совпадение без неявных приведений
+        if(fn->params.size() != argTypes.size()) continue;
+        
+        bool match = true;
+
+        auto typeVarMap = buildTypeVarMap(fn->typeParams);
+        for(std::size_t i = 0; i < fn->params.size(); i++){
+            auto paramType = resolveType(*fn->params[i].type, typeVarMap, errors);
+            if(!paramType || !(*paramType)->equals(*argTypes[i])){
+                match = false; break;
+            }
+        }
+
+        if(match) return fn;
+    }
+
+    errors.push_back(makeError(
+        "no matching overload for '" + name + "'", pos));
+    return nullptr;
+}
+
 
 void Analyzer::firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto modEnv = std::make_shared<Environment>(env);
@@ -1025,6 +1092,27 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     }
 
     
+    //проверка перегрузки
+    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+        if(m_overloads.count(ident->name) && m_overloads[ident->name].size() > 1){
+
+            std::vector<sPtr<TypeInfo>> argTypes; //собираем типы аргументов
+            for(const auto& arg : e.args){
+                auto t = analyzeExpr(*arg, env, errors);
+                if(!t) return std::nullopt;
+                argTypes.push_back(*t);
+            }
+            
+            const FuncDecl* resolved = resolveOverload(ident->name, argTypes, errors, e.pos);
+            if(!resolved) return std::nullopt;
+            
+            m_resolvedOverloads[&e] = resolved; //для кодогена сохраняем перегрузку в словарик
+            
+            // возвращаем тип возврата выбранной перегрузки
+            auto typeVarMap = buildTypeVarMap(resolved->typeParams);
+            return resolveType(**resolved->returnType, typeVarMap, errors);
+        }
+    }
 
     return analyzeCallArgs(e, *calleeType, env, errors);
 }

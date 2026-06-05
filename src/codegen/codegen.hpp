@@ -65,6 +65,7 @@ public:
     //пример в примере при match shape Circl -> tag = 0 - индекс конструктора в векторе dataTypeInfo::constructors
     CodeGenerator(const TypeRegistry& registry, const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes,
         const std::unordered_map<const CallExpr*, std::unordered_map<std::string, sPtr<TypeInfo>>>& callTypeMaps,
+        const std::unordered_map<const CallExpr*, const FuncDecl*>& resolvedOverloads,
         std::string filename = "<input>");
 
     //генерация полного .asm файла
@@ -99,6 +100,9 @@ private:
     const TypeRegistry& m_registry;
     const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& m_exprTypes;
     int getConstructorTag(const std::string& ctorName) const;
+
+    //перегрузка
+    const std::unordered_map<const CallExpr*, const FuncDecl*>& m_resolvedOverloads;
 
     //utilities
 

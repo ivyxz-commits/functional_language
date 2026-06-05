@@ -68,7 +68,8 @@ int runPipeline(const CLIOptions& opts){
     //Кодоген
     Codegen::CodeGenerator codegen(
         analyzer.get_registry(), analyzer.getExprTypes(), 
-        analyzer.getCallTypeMaps(), opts.filename);
+        analyzer.getCallTypeMaps(), analyzer.getResolvedOverloads(),
+        opts.filename);
 
     std::string asmCode = codegen.generate(prog);
 

@@ -15,11 +15,13 @@ CodeGenerator::CodeGenerator(const TypeRegistry& registry,
     const std::unordered_map<const ExprNode*, sPtr<TypeInfo>>& exprTypes, 
     const std::unordered_map<const CallExpr*, 
     std::unordered_map<std::string, sPtr<TypeInfo>>>& callTypeMaps,
+        const std::unordered_map<const CallExpr*, const FuncDecl*>& resolvedOverloads,
     std::string filename)
 
     :m_registry(registry),
     m_exprTypes(exprTypes), 
     m_callTypeMaps(callTypeMaps),
+    m_resolvedOverloads(resolvedOverloads),
     m_filename(std::move(filename)){}
 
 
@@ -373,14 +375,48 @@ void CodeGenerator::genModuleDecl(const ModuleDecl& mod){
     }
 }
 
+//перегрузка по любым параметрам
+static std::string getTypeNodeName(const TypeNode& node){
+    if(const auto* bt = std::get_if<BuiltinTypeNode>(&node.var)) return bt->name;
+    if(const auto* st = std::get_if<SimpleTypeNode>(&node.var)) return st->name;
 
+    if(const auto* lt = std::get_if<ListTypeNode>(&node.var)){
+        return "list_" + getTypeNodeName(*lt->elemType);
+    }
+
+    if(const auto* tt = std::get_if<TupleTypeNode>(&node.var)){
+        std::string s = "tuple";
+        for(const auto& e : tt->elems) s += "_" + getTypeNodeName(*e);
+        return s;
+    }
+
+    if(const auto* gt = std::get_if<GenericTypeNode>(&node.var)){
+        std::string s = gt->name;
+        for(const auto& a : gt->args) s += "_" + getTypeNodeName(*a);
+        return s;
+    }
+
+    if(const auto* ft = std::get_if<FunctionTypeNode>(&node.var))
+        return getTypeNodeName(*ft->from) + "_to_" + getTypeNodeName(*ft->to);
+    return "unknown";
+}
 
 //нужен точный размер стека - std::swap - based on move semantics //по факту один умный проход
 void CodeGenerator::genFuncDecl(const FuncDecl& fn){
     FuncContext ctx;  //контекст текущей функции - локальные переменные, offsets, размеры стека
     ctx.name = fn.name;
 
-    emitLabel("__fn_" + fn.name);
+    //название функции уникальное для перегрузки
+    std::string label = "__fn_" + fn.name;
+
+    for(const auto& p : fn.params){
+        label += "_" + getTypeNodeName(*p.type);
+    }
+
+    m_funcLabels[label] = label;
+    emitLabel(label);
+
+
     emit("push rbp");
     emit("mov rbp, rsp");
     
@@ -999,6 +1035,18 @@ void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
             }
         }
 
+        //выбираем нужную метку
+        auto overloadIt = m_resolvedOverloads.find(&e);
+        
+        if(overloadIt != m_resolvedOverloads.end()){
+            const FuncDecl* fn = overloadIt->second;
+            std::string label = "__fn_" + fn->name;
+            for(const auto& p : fn->params){
+                label += "_" + getTypeNodeName(*p.type);
+            }
+            emit("call " + label);
+            return;
+        }
 
         auto it = m_funcLabels.find(ident.name);
         if(it != m_funcLabels.end()){
