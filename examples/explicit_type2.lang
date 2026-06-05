@@ -1,0 +1,5 @@
+fn main() -> int64 = 
+    let a = 10 in 
+    let b = 3.5 in 
+    if a == b then print("wtf\n") else print("true\n")
+

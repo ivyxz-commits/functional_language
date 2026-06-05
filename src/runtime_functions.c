@@ -39,7 +39,11 @@ void lang_print_float(int64_t bits){
     double value;
     memcpy(&value, &bits, 8);
 
-    printf("%g\n", value);
+    if(value == (int64_t)value){
+        printf("%.1f\n", value); //764.0 -> 0
+    } else {
+        printf("%g\n", value); //34.smth
+    }
 }
 
 //для pattern matching

@@ -1,29 +1,4 @@
-fn identity[T](x: T) -> T = x
-
-fn first[T](x: T, y: T) -> T = x
-
-fn list[T](x: T) -> [T] = x : []
-
-//ADT
-data Box[T] = Box(T)
-
-fn unbox[T](b: Box[T]) -> T =
-    match b {
-        Box(x) -> x
-    }
-
-fn main() -> int64 =
-    let r1 = identity(19) in
-    let r2 = first(10, 20) in
-    let r3 = list(5) in
-
-    //explicit
-    //let b = Box[int64](99) in
-
-    //implicit
-    let b = Box(99) in
-
-    let r4 = unbox(b) in
-    let _ = print(r1) in
-    let _ = print(r2) in
-    print(r4)
+fn main() -> int64 = 
+    let a = 10 in
+    let b = 3.5 in 
+    if a == b then print("wtf\n") else print("true\n")

@@ -1,0 +1,5 @@
+fn add(a: float64, b: float64) -> float64 = 
+    a + b 
+
+fn main() -> int64 = 
+    let result = add(10, 3.5) in print(result)

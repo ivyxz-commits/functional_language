@@ -429,6 +429,7 @@ private:
     bool typesCompatible(const TypeInfo& a, const TypeInfo& b) const; //совместимость
     bool isNumericType(const TypeInfo& t) const;
     bool isBoolType(const TypeInfo& t) const;
+    bool isNumericWidening(const TypeInfo& from, const TypeInfo& to) const; //приведение типов
 
     //функция для перевода оператора в строку для ошибки
     static std::string binaryOpToString(BinaryOp op);

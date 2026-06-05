@@ -1,0 +1,10 @@
+fn to_float(x: int64) -> float64 = 
+    float64(x)
+
+fn to_int(x: float64) -> int64 = 
+    int64(x) 
+
+fn main() -> int64 = 
+    let a = to_float(37) in 
+    let b = to_int(34.83783) in
+    let _ = print(a) in print(b)

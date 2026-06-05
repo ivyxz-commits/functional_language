@@ -333,7 +333,9 @@ SemanticError Analyzer::makeError(std::string msg, Pos pos) const{
 bool Analyzer::typesCompatible(const TypeInfo& a, const TypeInfo& b) const{
     if(std::get_if<SimpleType>(&a.var)) return true; //T совместим с любым типом
     if(std::get_if<SimpleType>(&b.var)) return true; //int64 совместим с T
-    return a.equals(b);
+    if(a.equals(b)) return true;
+    if(isNumericWidening(a, b) || isNumericWidening(b, a)) return true;
+    return false;
 }
 
 //помогут в analyzeBinary и analyzeIf
@@ -354,6 +356,12 @@ bool Analyzer::isBoolType(const TypeInfo& t) const{
     return false;
 }
 
+bool Analyzer::isNumericWidening(const TypeInfo& from, const TypeInfo& to) const{
+    auto* btf = std::get_if<BuiltinType>(&from.var);
+    auto* btt = std::get_if<BuiltinType>(&to.var);
+    if(!btf || !btt) return false;
+    return btf->name == "int64" && btt -> name == "float64";
+}
 
 //создание начального окружения со встроенными функциями 
 sPtr<Environment> Analyzer::makeBuiltinEnv(){ 
@@ -828,6 +836,10 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeIf(
             (*elseType) -> toString() + "'", e.pos));
     }
 
+    if(isNumericWidening(**thenType, **elseType) || isNumericWidening(**elseType, **thenType)){
+        return makeBuiltin("float64");
+    }
+
     return *thenType;
 }
 
@@ -904,6 +916,10 @@ std::optional<sPtr<TypeInfo>> Analyzer::checkArithmetic(const BinaryExpr& e, con
                 left->toString() + "' and '" + 
                 right->toString() + "'", e.pos));
             return std::nullopt;
+        }
+
+        if(isNumericWidening(*left, *right) || isNumericWidening(*right, *left)){
+            return makeBuiltin("float64");
         }
 
         return left; //тип левого так как оба уже проверили
@@ -1129,12 +1145,7 @@ void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
 
             if(it != typeVarMap.end()){
                 
-                //если получали T уже для одного аругмента и он повторяется x: T
-                auto* bt1 = std::get_if<BuiltinType>(&it->second->var);
-                auto* bt2 = std::get_if<BuiltinType>(&arg->var);
-
-                //приведение типов int64 -> float64 будет допустимо
-                if(bt1 && bt2 && bt1->name == "int64" && bt2->name == "float64"){
+                if(isNumericWidening(*it->second, *arg)){
                     typeVarMap[st->name] = arg;
                 } else if(!typesCompatible(*it->second, *arg)){
                     errors.push_back(makeError(
@@ -1324,9 +1335,50 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallBuiltin(const IdentExpr& iden
         if(ident.name == "print") return analyzeCallPrint(e, env, errors);
         if(ident.name == "input_int") return analyzeCallInput("input_int", e, "int64", errors);
         if(ident.name == "input_float") return analyzeCallInput("input_float", e, "float64", errors);
+
+
+        //явные приведения
+        if(ident.name == "float64"){
+
+            if(e.args.size() != 1){
+                errors.push_back(makeError("float64() expects 1 argument", e.pos));
+                    return std::nullopt;
+            }
+                
+            auto argType = analyzeExpr(*e.args[0], env, errors);
+                
+            if(!argType) return std::nullopt;
+                
+            auto* bt = std::get_if<BuiltinType>(&(*argType)->var);
+            if(!bt || (bt->name != "int64" && bt->name != "float64")){
+                errors.push_back(makeError(
+                    "float64() expects int64 or float64, got '" + 
+                    (*argType)->toString() + "'", e.pos));
+                return std::nullopt;
+            }
+            return makeBuiltin("float64");
+        }
+
+        if(ident.name == "int64"){
+            if(e.args.size() != 1){
+                errors.push_back(makeError("int64() expects 1 argument", e.pos));
+                return std::nullopt;
+            }
+            auto argType = analyzeExpr(*e.args[0], env, errors);
+            if(!argType) return std::nullopt;
+            auto* bt = std::get_if<BuiltinType>(&(*argType)->var);
+            if(!bt || (bt->name != "int64" && bt->name != "float64")){
+                errors.push_back(makeError(
+                    "int64() expects int64 or float64, got '" + 
+                    (*argType)->toString() + "'", e.pos));
+                return std::nullopt;
+            }
+            return makeBuiltin("int64");
+        }
+
         return std::nullopt; //не встроенная функция
 
-        }
+}
 
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
     sPtr<Environment> env, std::vector<SemanticError>& errors){

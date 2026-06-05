@@ -346,6 +346,27 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parsePrimary(){
     if(check(TT::DELIM_LPAREN)) return parseTupleOrGroupedExpr();
     if(check(TT::IDENT)) return parseIdentOrConstructorExpr();
 
+    if(check(TT::KW_FLOAT64) || check(TT::KW_INT64)){
+        auto pos = currentPos();
+        std::string name = current().lexeme;
+        advance();
+
+        auto lp = expect(TT::DELIM_LPAREN);
+        if(!lp) return std::unexpected(lp.error());
+
+        auto args = parseArgList();
+        if(!args) return std::unexpected(args.error());
+
+        auto rp = expect(TT::DELIM_RPAREN);
+        if(!rp) return std::unexpected(rp.error());
+
+        IdentExpr callee{name, pos};
+        auto calleeNode = std::make_unique<ExprNode>(ExprNode{std::move(callee), pos});
+        
+        CallExpr ce{std::move(calleeNode), {}, std::move(*args), pos};
+        return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
+    }
+
     return std::unexpected(makeError("expected expression, got '" + current().lexeme + "'"));
 }
 

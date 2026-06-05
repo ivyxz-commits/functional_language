@@ -619,23 +619,33 @@ void CodeGenerator::genUnary(const UnaryExpr& e, FuncContext& ctx){
 
 //Binary
 void CodeGenerator::genBinary(const BinaryExpr& e, FuncContext& ctx){
-    bool isFloat = isFloatExpr(*e.left) || isFloatExpr(*e.right);
+    bool leftIsFloat  = isFloatExpr(*e.left);
+    bool rightIsFloat = isFloatExpr(*e.right);
+    bool isFloat = leftIsFloat || rightIsFloat;
     emit("; genBinary isFloat=" + std::string(isFloat ? "true" : "false"));
-    //левую часть на стек
-    genExpr(*e.left, ctx);
 
-    //сохраняем left
+    genExpr(*e.left, ctx);
+    if(isFloat && !leftIsFloat){
+        emit("cvtsi2sd xmm0, rax"); //int64 => float64
+        emit("movq rax, xmm0");
+    }
+
     int tmpOff = ctx.allocLocal("__binlhs");
     emit("mov [rbp" + std::to_string(tmpOff) + "], rax");
 
     genExpr(*e.right, ctx);
-    if(isFloat) emit("movq xmm1, rax"); 
+    if(isFloat && !rightIsFloat){
+        emit("cvtsi2sd xmm0, rax"); // int64 => float64
+        emit("movq rax, xmm0");
+    }
+
+    if(isFloat) emit("movq xmm1, rax");
     emit("mov rcx, rax");
 
     emit("mov rax, [rbp" + std::to_string(tmpOff) + "]");
     ctx.removeLocal("__binlhs");
 
-    if(isFloat) emit("movq xmm0, rax"); //левый в xmm0
+    if(isFloat) emit("movq xmm0, rax");
 
     if(isFloat) genFloatOp(e.op);
     else genIntOp(e.op);
@@ -758,9 +768,35 @@ void CodeGenerator::genIntOp(BinaryOp op){
 //Call - логика функций и лямбда
 void CodeGenerator::genCall(const CallExpr& e,const ExprNode& node, FuncContext& ctx){
 
-    std::vector<int> argOffsets; //аргументы на стек
-    for(const auto& arg : e.args){
-        genExpr(*arg, ctx);
+    sPtr<TypeInfo> calleeType = nullptr;
+    auto calleeIt = m_exprTypes.find(e.callee.get());
+    if(calleeIt != m_exprTypes.end()) calleeType = calleeIt->second;
+
+    std::vector<int> argOffsets;
+    for(std::size_t i = 0; i < e.args.size(); i++){
+        genExpr(*e.args[i], ctx);
+
+        if(calleeType){ //int64 -> float64
+            auto t = calleeType;
+            for(std::size_t j = 0; j < i; j++){
+                if(auto* ft = std::get_if<FunctionType>(&t->var)){
+                    t = ft->to;
+                }
+            }
+            if(auto* ft = std::get_if<FunctionType>(&t -> var)){
+                auto* paramBt = std::get_if<BuiltinType>(&ft -> from -> var);
+                auto argIt = m_exprTypes.find(e.args[i].get());
+                if(argIt != m_exprTypes.end()){
+                    auto* argBt = std::get_if<BuiltinType>(&argIt -> second->var);
+                    if(paramBt && argBt &&
+                    paramBt->name == "float64" && argBt -> name == "int64"){
+                        emit("cvtsi2sd xmm0, rax");
+                        emit("movq rax, xmm0");
+                    }
+                }
+            }
+        }
+
         int off = ctx.allocLocal("__arg");
         emit("mov [rbp" + std::to_string(off) + "], rax");
         argOffsets.push_back(off);
@@ -874,6 +910,37 @@ void CodeGenerator::genCallBuiltin(const IdentExpr& ident, const CallExpr& e){
     else if(ident.name == "panic"){
         emit("call __lang_panic");
     }
+
+    //приведения типов
+    else if(ident.name == "float64"){
+        auto it = m_exprTypes.find(e.args[0].get());
+        
+        if(it != m_exprTypes.end()){
+            auto* bt = std::get_if<BuiltinType>(&it->second->var);
+            if(bt && bt->name == "int64"){
+                emit("cvtsi2sd xmm0, rdi");
+                emit("movq rax, xmm0");
+            } else {
+                emit("movq rax, rdi"); //уже float64
+            }
+        }
+    }
+
+    //дробную часть обрежем
+    else if(ident.name == "int64"){
+        auto it = m_exprTypes.find(e.args[0].get());
+        if(it != m_exprTypes.end()){
+            auto* bt = std::get_if<BuiltinType>(&it->second->var);
+            if(bt && bt->name == "float64"){
+                emit("movq xmm0, rdi");
+                emit("cvttsd2si rax, xmm0");
+            } else {
+                emit("mov rax, rdi"); //уже int64
+            }
+        }
+    }
+
+
 }
     
 void CodeGenerator::genCallClosure(const std::vector<int>& argOffsets){ 
@@ -1301,9 +1368,9 @@ void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
     }
 
     emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //указатель на конструктор
-    ctx.removeLocal("__tuple_ptr");
+    ctx.removeLocal("__ctor_ptr");
 
-    for(int i = 0; i < n; i++) ctx.removeLocal("__telems"); //удаляем временные имена элементов из контекста
+    for(int i = 0; i < n; i++) ctx.removeLocal("__carg"); //удаляем временные имена элементов из контекста
 }
 
 
@@ -1706,7 +1773,7 @@ void CodeGenerator::genListPattern(const ListPatternNode& p,
 
         for(const auto& elem : p.elems){
             emit("mov rcx, [rax]");
-            emit("сmp rcx, 0");
+            emit("cmp rcx, 0");
             emit("jz " + failLabel); //если список закончился раньше паттерна - Nil => tag = 0
 
             emit("mov rcx, [rax + 16]"); //tail будет нужен для следующей итерации - разворчиваем cons

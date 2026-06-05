@@ -114,7 +114,7 @@ std::expected<TypeAliasDecl, ParseError> Parser::parseTypeAliasDecl(){
     if(!eq) return std::unexpected(eq.error());
 
     auto t = parseType(); //тут auto вместо std::expected<Ptr<TypeNode>, ParseError> 
-    if(!eq) return std::unexpected(t.error());
+    if(!t) return std::unexpected(t.error());
 
     return TypeAliasDecl{std::move(nameTok -> lexeme), std::move(*t), pos};
 }
