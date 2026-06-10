@@ -1,7 +1,9 @@
 #pragma once
 
+#include "codegen_context.hpp"
 #include "ast.hpp"
 #include "semantic.hpp"
+
 #include <sstream>
 #include <set> //уникальные элементы в отсортированном порядке
 
@@ -10,52 +12,6 @@ namespace Codegen{
 using namespace Parser;
 using namespace Semantic;
 
-//всегда на стеке
-struct LocalVar{
-    std::string name;
-    int offset; //смещение от rbp: -8, -16
-};
-
-//информация нужная при генерации одной функции
-struct FuncContext{
-    std::string name;
-    int stackSize = 0;
-    int nextOffset = 0; //следующее свободное смещение
-    std::vector<LocalVar> locals;
-
-    int allocLocal(const std::string& varName){
-        nextOffset -= 8;
-        locals.push_back({varName, nextOffset});
-        stackSize = -nextOffset;
-        return nextOffset; //где лежит переменная
-    }
-
-    //1. локальные на стеке -> глобальные функции -> встроенные
-    std::optional<int> findLocal(const std::string& varName) const {
-
-         //ищем с конца веткора, первый найденный - последний добавленный - shadowing
-        for(auto it = locals.rbegin(); it != locals.rend(); it++){ 
-            if(it->name == varName) return it->offset;
-        }
-        return std::nullopt;
-    }
-
-    //тоже для shadowing
-    void removeLocal(const std::string& varName){
-    for(int i = static_cast<int>(locals.size()) - 1; i >= 0; --i){
-        if(locals[i].name == varName){
-            locals.erase(locals.begin() + i);
-            return;
-        }
-    }
-}
-
-    //должен быть выравнен по 16 байт
-    int alignedStackSize() const{
-        if(stackSize % 16 == 0) return stackSize;
-        return stackSize + (16 - stackSize % 16);
-    }
-};
 
 //обход AST и генерация текста для ассемблера
 class CodeGenerator{
@@ -89,6 +45,8 @@ private:
     int m_strCnt = 0; // .data
     std::unordered_map<std::string, std::string> m_funcLabels; //add и __fn_add //тут лежит тело функции
 
+
+
     //дженерики
     std::unordered_map<std::string, const FuncDecl*> m_genericFuncs;
     std::set<std::string> m_generatedInstances; //чтобы метки функций не повторялись
@@ -104,6 +62,7 @@ private:
     //перегрузка
     const std::unordered_map<const CallExpr*, const FuncDecl*>& m_resolvedOverloads;
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //utilities
 
     //работа с метками
@@ -125,6 +84,7 @@ private:
     void emitPanic();
     void emitExit();
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //declarations
     void genDecl(const DeclNode& decl);
 
@@ -140,6 +100,8 @@ private:
 
     void genModuleDecl(const ModuleDecl& mod);
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //expressions - rax
     void genExpr(const ExprNode& expr, FuncContext& ctx);
     void genIdent(const IdentExpr& e,const ExprNode& node, FuncContext& ctx);
@@ -182,7 +144,7 @@ private:
         const std::vector<int>& argOffsets, FuncContext& ctx); 
 
 
-    ///////////////////////////////////////////////////////////////////////////////
+    //вспомогательные для каррирования и частичного применения
      void genPartialApply(const CallExpr& e, const std::vector<int>&
         argOffsets, FuncContext& ctx);
 
@@ -194,6 +156,7 @@ private:
         const std::vector<int>& argOffsets, FuncContext& ctx); //code_ptr - лямбда обертки и захваченные аргументы 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //patterns matching
     void genPattern(const PatternNode& pattern, const std::string& valueReg, //target
                     const std::string& failLabel, FuncContext& ctx); //failLabel - метка следующей ветки match
@@ -230,8 +193,8 @@ private:
 
 
 
-
-    //замыкания
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //замыкания - лямбда функции
     std::string genLambdaFunc(const LambdaExpr& e, const std::vector<std::string>& captured, FuncContext& outer);
     //у нее две свои вспомогательные
     void genLambdaCaptured(const std::vector<std::string>& captured, int envOff, FuncContext& ctx);
@@ -241,6 +204,7 @@ private:
     //вспомогательная к findFreeVars
     void scanExpr(const ExprNode& expr, const std::vector<std::string>& bound, const FuncContext& ctx, std::vector<std::string>& result) const;
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //ABI
     static const char* argReg(int i); //rdi, rsi
     void emitAlloc(int size); //память в куче
