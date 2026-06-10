@@ -119,7 +119,7 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
             "function '" + fn.name + "' is already declared", fn.pos));
     }
 
-    if(m_overloads.size() == 1){ //первая перегрузка
+    if(m_overloads[fn.name].size() == 1){ //первая перегрузка
         env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos});
     }
 
@@ -143,7 +143,7 @@ sPtr<TypeInfo> Analyzer::buildFuncType(const FuncDecl& fn,
         if(fn.params.empty()) return makeFunction(makeBuiltin("unit"), retType); 
     
 
-        sPtr<TypeInfo> funcType;
+        sPtr<TypeInfo> funcType = retType;
         bool hasError = false;
 
         for(int i = static_cast<int>(fn.params.size()) - 1; i >= 0; i--){

@@ -575,7 +575,7 @@ bool CodeGenerator::genCallCheckClosure(const CallExpr& e, FuncContext& ctx){
         return false; //выражение всегда замыкание
     }
 
-    return true; //выражение - всегда замыкание
+    return false; //выражение - всегда замыкание
 }
 
 void CodeGenerator::genCallLoadArgs(const std::vector<int>& argOffsets){
@@ -763,7 +763,7 @@ void CodeGenerator::genPartialClosureKnown(const std::string& wrapLabel, const s
         for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){
             emit("mov rax, [rbp" + std::to_string(envOff) + "]");
             emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
-            emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
+            emit("mov [rax + " + std::to_string(i * 8) + "], rcx");
         }
 
         emit("mov rdi, 16");
@@ -801,7 +801,7 @@ void CodeGenerator::genPartialClosureUnknown(const std::string& wrapLabel,
         for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){ //аргументы в env
             emit("mov rax, [rbp" + std::to_string(envOff) + "]");
             emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
-            emit("mov [rax + " + std::to_string(i * 8) + "], rcx");
+            emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
         }
 
         emit("mov rdi, 16"); //{code_ptr, env_ptr}

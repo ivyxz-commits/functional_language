@@ -73,7 +73,8 @@ bool TypeInfo::equals(const TypeInfo& other) const {
     //fn apply(f: int64 -> bool, x: string) -> bool = f(x) //Ошибка 
     if(auto* a = std::get_if<FunctionType>(&var)){ 
         auto* b = std::get_if<FunctionType>(&other.var);
-        return a->from->equals(*b->from) && a->to->equals(*b -> to);
+        if(!a->from || !b->from || !a->to || !b->to) return false;
+        return a->from->equals(*b->from) && a->to->equals(*b->to);
     }
 
     return false; //типы неизвестного вида несовместимы - никогда не дойдем до этого
