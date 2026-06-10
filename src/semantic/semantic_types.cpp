@@ -1,5 +1,5 @@
 #include "semantic.hpp"
-#include "semantic_utils.cpp"
+#include "semantic_utilities.hpp"
 
 namespace Semantic{
 

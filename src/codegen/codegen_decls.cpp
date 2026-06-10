@@ -24,7 +24,7 @@ void CodeGenerator::genModuleDecl(const ModuleDecl& mod){
 }
 
 //перегрузка по любым параметрам
-static std::string getTypeNodeName(const TypeNode& node){
+std::string CodeGenerator::getTypeNodeName(const TypeNode& node){
     if(const auto* bt = std::get_if<BuiltinTypeNode>(&node.var)) return bt->name;
     if(const auto* st = std::get_if<SimpleTypeNode>(&node.var)) return st->name;
 

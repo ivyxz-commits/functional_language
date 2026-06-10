@@ -1,5 +1,5 @@
 #include "semantic.hpp"
-#include "semantic_utils.cpp"
+#include "semantic_utilities.hpp"
 
 namespace Semantic{
 
@@ -17,42 +17,66 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
     auto calleeType = analyzeExpr(*e.callee, env, errors); //из окружения получим Тип int64 -> int64 -> int64 
     if(!calleeType) return std::nullopt;
 
+    //дженерики
+    if(!analyzeCallGeneric(e, calleeType, env, errors)) return std::nullopt;
 
-    //Если дженерик без аргументов - ошибка
-    if(e.typeArgs.empty()){
-        if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
-            if(m_funcTypeParams.count(ident->name)){
-                auto typeVarMap = inferenceTypeArgs(ident->name, e, env, errors);
-                if(!typeVarMap) return std::nullopt;
-                m_callTypeMaps[&e] = *typeVarMap;
-                calleeType = changeTypeVars(**calleeType, *typeVarMap); //вставляем все разрешенные типы
-                checkGenericFuncBody(*m_genericFuncDecls[ident->name], *typeVarMap, env, errors);
-            }
-        }
+    //перегрузки
+    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+        auto overloadResult = analyzeCallOverload(*ident, e, env, errors);
+        if(overloadResult) return overloadResult;
     }
 
-    //для аргументов 
-    if(!e.typeArgs.empty()){
-        if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){ //ищем дженерик функцию в окружении
-            auto symbol = env->lookup(ident -> name);
-            if(symbol){ //получаем typeParams функции
-                auto typeVarMap = buildCallTypeVarMap(ident->name, e.typeArgs, env, errors);
-                if(!typeVarMap) return std::nullopt;
-                m_callTypeMaps[&e] = *typeVarMap; //сохраняем для кодогена
-                calleeType = changeTypeVars(**calleeType, *typeVarMap);
+    return analyzeCallArgs(e, *calleeType, env, errors);
+}
 
-                auto it = m_genericFuncDecls.find(ident -> name);
-                if(it != m_genericFuncDecls.end()){
-                    checkGenericFuncBody(*it->second, *typeVarMap, env, errors);
+//+
+
+//укорачивающие основную функцию analyzeCall
+
+//подстановка корректных типов вместо Т
+bool Analyzer::analyzeCallGeneric(const CallExpr& e, std::optional<sPtr<TypeInfo>>& calleeType,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        //Если дженерик без аргументов - ошибка
+        if(e.typeArgs.empty()){
+            if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+                if(m_funcTypeParams.count(ident->name)){
+                    auto typeVarMap = inferenceTypeArgs(ident->name, e, env, errors);
+                    if(!typeVarMap) return false;
+                    m_callTypeMaps[&e] = *typeVarMap;
+                    calleeType = changeTypeVars(**calleeType, *typeVarMap); //вставляем все разрешенные типы
+                    checkGenericFuncBody(*m_genericFuncDecls[ident->name], *typeVarMap, env, errors);
                 }
             }
         }
-    }
 
-    
-    //проверка перегрузки
-    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
-        if(m_overloads.count(ident->name) && m_overloads[ident->name].size() > 1){
+        //для аргументов 
+        if(!e.typeArgs.empty()){
+            if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){ //ищем дженерик функцию в окружении
+                auto symbol = env->lookup(ident -> name);
+                if(symbol){ //получаем typeParams функции
+                    auto typeVarMap = buildCallTypeVarMap(ident->name, e.typeArgs, env, errors);
+                    if(!typeVarMap) return false;
+                    m_callTypeMaps[&e] = *typeVarMap; //сохраняем для кодогена
+                    calleeType = changeTypeVars(**calleeType, *typeVarMap);
+
+                    auto it = m_genericFuncDecls.find(ident -> name);
+                    if(it != m_genericFuncDecls.end()){
+                        checkGenericFuncBody(*it->second, *typeVarMap, env, errors);
+                    }
+                }
+            }
+        }
+
+        return true;
+}
+
+//выбираем нужную перегрузку
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallOverload(const IdentExpr& ident,
+    const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+        if(!m_overloads.count(ident.name) || m_overloads[ident.name].size() <= 1)
+            return std::nullopt;
 
             std::vector<sPtr<TypeInfo>> argTypes; //собираем типы аргументов
             for(const auto& arg : e.args){
@@ -61,20 +85,18 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
                 argTypes.push_back(*t);
             }
             
-            const FuncDecl* resolved = resolveOverload(ident->name, argTypes, errors, e.pos);
+            const FuncDecl* resolved = resolveOverload(ident.name, argTypes, errors, e.pos);
             if(!resolved) return std::nullopt;
             
             m_resolvedOverloads[&e] = resolved; //для кодогена сохраняем перегрузку в словарик
-            
+
             // возвращаем тип возврата выбранной перегрузки
             auto typeVarMap = buildTypeVarMap(resolved->typeParams);
             return resolveType(**resolved->returnType, typeVarMap, errors);
-        }
-    }
-
-    return analyzeCallArgs(e, *calleeType, env, errors);
 }
 
+
+//+
 
 //вспомогательные функции обработки generic`ов функции и ADT
 
@@ -178,6 +200,7 @@ sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
         return std::make_shared<TypeInfo>(type); //для BuiltinType
 }
 
+//+
 
 //Унификация generic`ов 
 
@@ -305,6 +328,8 @@ std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>> Analyzer::inferen
     }
     return typeVarMap;
 }
+
+//+
 
 //вспомогательные функции analyzeCall()
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallPrint(const CallExpr& e, 

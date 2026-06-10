@@ -240,6 +240,17 @@ private:
         const std::optional<ConstructorInfo>& ctorInfo, sPtr<Environment> env, 
         std::vector<SemanticError>& errors);
 
+    /*
+    *две сокращающие для дженериков и перегрузки
+    */
+
+    //дженерик вызовы - какие типы вместо Т
+    bool analyzeCallGeneric(const CallExpr& e, std::optional<sPtr<TypeInfo>>& calleeType,
+    sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> analyzeCallOverload(const IdentExpr& ident,
+        const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
+
     ///////////////////////////////////////
     //LetIn
     std::optional<sPtr<TypeInfo>> analyzeLetIn(const LetInExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors);
@@ -308,8 +319,18 @@ private:
     //вспомогательные функции - первоначальный обход
     void firstPassAlias(const TypeAliasDecl& alias, std::vector<SemanticError>& errors);
     void firstPassData(const DataDecl& data, std::vector<SemanticError>& errors);
-    void firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
     void firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors);
+   
+    void firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors);
+    //для нее отдельные вспомогательные функции
+    sPtr<TypeInfo> buildFuncType(const FuncDecl& fn,
+        const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
+
+    bool checkOverloadDuplicate(const FuncDecl& fn,
+        const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
+
+    std::string buildMangledName(const FuncDecl& fn,
+        const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors);
 
     /* //если идти по порядку при анализации smth, bar еще не будет зарегестрирован и получим ошибку
     /поэтому сначала регистрируем все обозначения и типы до проверки тел

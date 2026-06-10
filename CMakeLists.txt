@@ -15,27 +15,36 @@ add_custom_target(runtime_files DEPENDS
     ${CMAKE_BINARY_DIR}/runtime_functions.o)
 
 add_executable(lang
-    src/main.cpp
-    src/cli/options.cpp
-    src/debug/dump.cpp
-    src/pipeline.cpp
+    src/run/main.cpp
+    src/run/cli/options.cpp
+    src/run/debug/dump.cpp
+    src/run/pipeline.cpp
     src/lexer/lexer.cpp
     src/parser/parser_base.cpp
     src/parser/parser_decls.cpp
     src/parser/parser_exprs.cpp
     src/parser/parser_patterns.cpp
     src/parser/parser_types.cpp
-    src/semantic/semantic.cpp
-    src/codegen/codegen.cpp)
+    src/semantic/semantic_types.cpp
+    src/semantic/semantic_utilities.cpp
+    src/semantic/semantic_decls.cpp
+    src/semantic/semantic_exprs.cpp
+    src/semantic/semantic_call.cpp
+    src/semantic/semantic_match.cpp
+    src/codegen/codegen_utilities.cpp
+    src/codegen/codegen_decls.cpp
+    src/codegen/codegen_exprs.cpp
+    src/codegen/codegen_match.cpp)
 
 target_include_directories(lang PRIVATE
     src
-    src/cli
-    src/debug
+    src/run
+    src/run/cli
+    src/run/debug
     src/lexer
     src/parser
-    src/semantic
-    src/codegen)
+    src/semantic/headers_semantic
+    src/codegen/codegen_headers)
 
 target_compile_options(lang PRIVATE
     -Wall -Wextra)
@@ -46,7 +55,7 @@ target_link_libraries(lang PRIVATE
     ${CMAKE_BINARY_DIR}/runtime_functions.o
     c)
 
-# цель build (по умолчанию)
+# цель build
 add_custom_target(build DEPENDS lang)
 
 # цель run

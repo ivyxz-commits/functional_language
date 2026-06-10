@@ -86,7 +86,7 @@ clean: CMakeFiles/clean_all.dir/clean
 CMakeFiles/runtime_files.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime_files.dir/build.make CMakeFiles/runtime_files.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/runtime_files.dir/build.make CMakeFiles/runtime_files.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=14 "Built target runtime_files"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=22 "Built target runtime_files"
 .PHONY : CMakeFiles/runtime_files.dir/all
 
 # Build rule for subdir invocation for target.
@@ -112,12 +112,12 @@ CMakeFiles/runtime_files.dir/clean:
 CMakeFiles/lang.dir/all: CMakeFiles/runtime_files.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lang.dir/build.make CMakeFiles/lang.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13 "Built target lang"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 "Built target lang"
 .PHONY : CMakeFiles/lang.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/lang.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/lang.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
 .PHONY : CMakeFiles/lang.dir/rule
@@ -143,7 +143,7 @@ CMakeFiles/build.dir/all: CMakeFiles/lang.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/build.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/build.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
 .PHONY : CMakeFiles/build.dir/rule
@@ -169,7 +169,7 @@ CMakeFiles/run.dir/all: CMakeFiles/lang.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/run.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/run.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
 .PHONY : CMakeFiles/run.dir/rule
@@ -195,7 +195,7 @@ CMakeFiles/debug.dir/all: CMakeFiles/lang.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/debug.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/debug.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ivan_su/project/build/CMakeFiles 0
 .PHONY : CMakeFiles/debug.dir/rule

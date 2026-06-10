@@ -1,5 +1,5 @@
 #include "semantic.hpp"
-#include "semantic_utils.cpp"
+#include "semantic_utilities.hpp"
 
 namespace Semantic{
 
@@ -96,23 +96,54 @@ void Analyzer::firstPassData(const DataDecl& data, std::vector<SemanticError>& e
     analyzeDataDecl(data, errors);
 }
 
-//правоассоцитвное построение + левый обход - возможный доп для частичного применения
+////////////////////////////////////////////////////////////////////////////////
 void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vector<SemanticError>& errors){
+    
     if(!fn.returnType){
         errors.push_back(makeError(
             "function '" + fn.name + "' missing return type annotation", fn.pos)); //не указали тип
     }
 
     auto typeVarMap = buildTypeVarMap(fn.typeParams);
+    sPtr<TypeInfo> funcType = buildFuncType(fn, typeVarMap, errors);
 
-    auto rt = resolveType(**fn.returnType, typeVarMap, errors);
-    sPtr<TypeInfo> retType = rt ? *rt : makeBuiltin("unit"); //чтобы продолжили обрабатывать функцию
+    m_overloads[fn.name].push_back(&fn);
 
-    sPtr<TypeInfo> funcType;
-    if(fn.params.empty()){
-        funcType = makeFunction(makeBuiltin("unit"), retType);
-    } else {
-        funcType = retType;
+    if(checkOverloadDuplicate(fn, typeVarMap, errors)) return;
+
+    // в окружение уже с модифицированным именем
+    std::string mangledName = buildMangledName(fn, typeVarMap, errors);
+
+    if(!env->define(mangledName, Symbol{mangledName, funcType, false, fn.pos})){
+        errors.push_back(makeError(
+            "function '" + fn.name + "' is already declared", fn.pos));
+    }
+
+    if(m_overloads.size() == 1){ //первая перегрузка
+        env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos});
+    }
+
+    if(!fn.typeParams.empty()){ //с отсутсвием параметров не записываем
+        m_funcTypeParams[fn.name] = fn.typeParams;
+        m_genericFuncDecls[fn.name] = &fn;
+    }
+}
+
+/*
+*вспомогательные для firstPassFunc
+*/
+
+//строит тип функции
+sPtr<TypeInfo> Analyzer::buildFuncType(const FuncDecl& fn,
+    const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors){
+
+        auto rt = resolveType(**fn.returnType, typeVarMap, errors);
+        sPtr<TypeInfo> retType = rt ? *rt : makeBuiltin("unit"); //чтобы продолжили обрабатывать функцию
+
+        if(fn.params.empty()) return makeFunction(makeBuiltin("unit"), retType); 
+    
+
+        sPtr<TypeInfo> funcType;
         bool hasError = false;
 
         for(int i = static_cast<int>(fn.params.size()) - 1; i >= 0; i--){
@@ -127,17 +158,19 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
         }
 
         if(hasError) funcType = makeBuiltin("unit");
-    }
+        return funcType;
+}
 
-    m_overloads[fn.name].push_back(&fn);
+//проверяем дупликат перегрузки
+bool Analyzer::checkOverloadDuplicate(const FuncDecl& fn,
+    const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors){
 
-    auto& overloads = m_overloads[fn.name]; //проверка на дубликат
-    for(std::size_t i = 0; i < overloads.size() - 1; i++){
+        auto& overloads = m_overloads[fn.name]; //проверка на дубликат
+        for(std::size_t i = 0; i < overloads.size() - 1; i++){
+            const FuncDecl* other = overloads[i];
+            if(other->params.size() == fn.params.size()) continue; //сравнение типов параметров
 
-        const FuncDecl* other = overloads[i];
-        if(other->params.size() == fn.params.size()){ //сравнение типов параметров
             bool same = true;
-
             for(std::size_t j = 0; j < fn.params.size(); j++){
                 auto t1 = resolveType(*fn.params[j].type, typeVarMap, errors);
                 auto t2 = resolveType(*other->params[j].type, typeVarMap, errors);
@@ -149,33 +182,27 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
             if(same){
                 errors.push_back(makeError(
                     "function '" + fn.name + "' with same parameter types is already declared", fn.pos));
-                return;
+                return true;
             }
         }
-    }
-
-    // в окружение уже с модифицированным именем
-    std::string mangledName = fn.name;
-    for(const auto& p : fn.params){
-        auto pt = resolveType(*p.type, typeVarMap, errors);
-        if(pt) mangledName += "_" + (*pt)->toString();
-    }
-
-    if(!env->define(mangledName, Symbol{mangledName, funcType, false, fn.pos})){
-        errors.push_back(makeError(
-            "function '" + fn.name + "' is already declared", fn.pos));
-    }
-
-    if(overloads.size() == 1){ //первая перегрузка
-        env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos});
-    }
-
-
-    if(!fn.typeParams.empty()){ //с отсутсвием параметров не записываем
-        m_funcTypeParams[fn.name] = fn.typeParams;
-        m_genericFuncDecls[fn.name] = &fn;
-    }
+        return false;
 }
+
+
+//формируем уникальное имя для перегрузки
+std::string Analyzer::buildMangledName(const FuncDecl& fn,
+    const TypeVarMap& typeVarMap, std::vector<SemanticError>& errors){
+
+        // в окружение уже с модифицированным именем
+        std::string mangledName = fn.name;
+        for(const auto& p : fn.params){
+            auto pt = resolveType(*p.type, typeVarMap, errors);
+            if(pt) mangledName += "_" + (*pt)->toString();
+        }
+        return mangledName;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 //выбор нужной перегрузки
 const FuncDecl* Analyzer::resolveOverload(const std::string& name,

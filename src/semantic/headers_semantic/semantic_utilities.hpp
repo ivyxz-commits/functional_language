@@ -17,6 +17,7 @@ Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls);
 std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(
     const std::vector<std::string>& typeParams);
 
+std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e);
 
 bool isArithmetic(BinaryOp op);
 bool isComparison(BinaryOp op);

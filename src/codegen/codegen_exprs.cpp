@@ -318,39 +318,7 @@ void CodeGenerator::genIntOp(BinaryOp op){
 //Call - логика функций и лямбда
 void CodeGenerator::genCall(const CallExpr& e,const ExprNode& node, FuncContext& ctx){
 
-    sPtr<TypeInfo> calleeType = nullptr;
-    auto calleeIt = m_exprTypes.find(e.callee.get());
-    if(calleeIt != m_exprTypes.end()) calleeType = calleeIt->second;
-
-    std::vector<int> argOffsets;
-    for(std::size_t i = 0; i < e.args.size(); i++){
-        genExpr(*e.args[i], ctx);
-
-        if(calleeType){ //int64 -> float64
-            auto t = calleeType;
-            for(std::size_t j = 0; j < i; j++){
-                if(auto* ft = std::get_if<FunctionType>(&t->var)){
-                    t = ft->to;
-                }
-            }
-            if(auto* ft = std::get_if<FunctionType>(&t -> var)){
-                auto* paramBt = std::get_if<BuiltinType>(&ft -> from -> var);
-                auto argIt = m_exprTypes.find(e.args[i].get());
-                if(argIt != m_exprTypes.end()){
-                    auto* argBt = std::get_if<BuiltinType>(&argIt -> second->var);
-                    if(paramBt && argBt &&
-                    paramBt->name == "float64" && argBt -> name == "int64"){
-                        emit("cvtsi2sd xmm0, rax");
-                        emit("movq rax, xmm0");
-                    }
-                }
-            }
-        }
-
-        int off = ctx.allocLocal("__arg");
-        emit("mov [rbp" + std::to_string(off) + "], rax");
-        argOffsets.push_back(off);
-    }
+    std::vector<int> argOffsets = genCallPrepareArgs(e, ctx);
 
     //проверка частичного применения, если оно, то genPartAppl сам разберется
     if(isPartialCall(node)){
@@ -364,28 +332,12 @@ void CodeGenerator::genCall(const CallExpr& e,const ExprNode& node, FuncContext&
         return;
     }
 
-    bool isClosureCall = false;
-    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
-        if(!m_funcLabels.count(ident->name) && ctx.findLocal(ident->name)){
-            isClosureCall = true; //если не FuncLabel и есть в лкоальных - замыкание
-        }
-    } else {
-        isClosureCall = true; //выражение всегда замыкание
-    }
-
+    bool isClosureCall = genCallCheckClosure(e, ctx); //замыкание или нет
+    
     //по ABI аргументы кладутся на стек в обратном порядке, чтобы первый элемент по меньшему адресу rbp
     //a -> [984], b -> [992] | a ближе к стеку => rbp + 16 = a
-    if(!isClosureCall){
-        for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 6; i--){
-            emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
-        }
+    if(!isClosureCall) genCallLoadArgs(argOffsets);
 
-        //первые 6 в регистры
-        for(int i = 0; i < static_cast<int>(argOffsets.size()) && i < 6; i++){
-            emit("mov " + std::string(argReg(i)) +
-                ", [rbp" + std::to_string(argOffsets[i]) + "]");
-        }
-    }
 
     if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
         genCallIdent(*ident, e, argOffsets, ctx);
@@ -403,14 +355,7 @@ void CodeGenerator::genCall(const CallExpr& e,const ExprNode& node, FuncContext&
         *double(2)(10) //double(2) вовзращает лямбду
         */
 
-    int stackArgs = static_cast<int>(argOffsets.size()) - 6;
-    if(stackArgs > 0){
-        emit("add rsp, " + std::to_string(stackArgs * 8));
-    }
-
-    for(int i = 0; i < static_cast<int>(argOffsets.size()); ++i){
-        ctx.removeLocal("__arg");
-    }
+    genCallCleanup(argOffsets, ctx);
 }
 
 //вспомогательные
@@ -577,32 +522,87 @@ void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
         if(genCallBuiltin(ident, e), true) return; //встроенная функция
 }
 
+/*
+*Дополнительные вспомогательные
+*/
 
-//перегрузка по любым параметрам
-static std::string getTypeNodeName(const TypeNode& node){
-    if(const auto* bt = std::get_if<BuiltinTypeNode>(&node.var)) return bt->name;
-    if(const auto* st = std::get_if<SimpleTypeNode>(&node.var)) return st->name;
+std::vector<int> CodeGenerator::genCallPrepareArgs(const CallExpr& e, FuncContext& ctx){
+    
+    sPtr<TypeInfo> calleeType = nullptr;
+    auto calleeIt = m_exprTypes.find(e.callee.get());
+    if(calleeIt != m_exprTypes.end()) calleeType = calleeIt->second;
 
-    if(const auto* lt = std::get_if<ListTypeNode>(&node.var)){
-        return "list_" + getTypeNodeName(*lt->elemType);
+    std::vector<int> argOffsets;
+    for(std::size_t i = 0; i < e.args.size(); i++){
+        genExpr(*e.args[i], ctx);
+
+        if(calleeType){ //int64 -> float64
+            auto t = calleeType;
+            for(std::size_t j = 0; j < i; j++){
+                if(auto* ft = std::get_if<FunctionType>(&t->var)){
+                    t = ft->to;
+                }
+            }
+
+            if(auto* ft = std::get_if<FunctionType>(&t -> var)){
+                auto* paramBt = std::get_if<BuiltinType>(&ft -> from -> var);
+                auto argIt = m_exprTypes.find(e.args[i].get());
+                if(argIt != m_exprTypes.end()){
+                    auto* argBt = std::get_if<BuiltinType>(&argIt -> second->var);
+                    if(paramBt && argBt &&
+                    paramBt->name == "float64" && argBt -> name == "int64"){
+                        emit("cvtsi2sd xmm0, rax");
+                        emit("movq rax, xmm0");
+                    }
+                }
+            }
+        }
+
+        int off = ctx.allocLocal("__arg");
+        emit("mov [rbp" + std::to_string(off) + "], rax");
+        argOffsets.push_back(off);
     }
 
-    if(const auto* tt = std::get_if<TupleTypeNode>(&node.var)){
-        std::string s = "tuple";
-        for(const auto& e : tt->elems) s += "_" + getTypeNodeName(*e);
-        return s;
-    }
-
-    if(const auto* gt = std::get_if<GenericTypeNode>(&node.var)){
-        std::string s = gt->name;
-        for(const auto& a : gt->args) s += "_" + getTypeNodeName(*a);
-        return s;
-    }
-
-    if(const auto* ft = std::get_if<FunctionTypeNode>(&node.var))
-        return getTypeNodeName(*ft->from) + "_to_" + getTypeNodeName(*ft->to);
-    return "unknown";
+    return argOffsets;
 }
+
+bool CodeGenerator::genCallCheckClosure(const CallExpr& e, FuncContext& ctx){
+    if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
+        if(!m_funcLabels.count(ident->name) && ctx.findLocal(ident->name)){
+            return true; //если не FuncLabel и есть в лкоальных - замыкание
+        }
+    } else {
+        return false; //выражение всегда замыкание
+    }
+
+    return true; //выражение - всегда замыкание
+}
+
+void CodeGenerator::genCallLoadArgs(const std::vector<int>& argOffsets){
+    
+    for(int i = static_cast<int>(argOffsets.size()) - 1; i >= 6; i--){
+            emit("push qword [rbp" + std::to_string(argOffsets[i]) + "]");
+        }
+
+    //первые 6 в регистры
+    for(int i = 0; i < static_cast<int>(argOffsets.size()) && i < 6; i++){
+        emit("mov " + std::string(argReg(i)) +
+            ", [rbp" + std::to_string(argOffsets[i]) + "]");
+    }
+}
+
+void CodeGenerator::genCallCleanup(const std::vector<int>& argOffsets, FuncContext& ctx){
+    
+    int stackArgs = static_cast<int>(argOffsets.size()) - 6;
+    if(stackArgs > 0){
+        emit("add rsp, " + std::to_string(stackArgs * 8));
+    }
+
+    for(int i = 0; i < static_cast<int>(argOffsets.size()); ++i){
+        ctx.removeLocal("__arg");
+    }
+}
+
 
 /*
 *вспомогательные функции для частичного применения
@@ -658,6 +658,27 @@ std::string CodeGenerator::genPartialWrapLambda(const std::string& funcLabel, in
     int raw = (capturedCount + 2) * 8;
     int stackSize = ((raw + 15) / 16) * 16;
 
+    emitPartialWrapSetup(wrapLabel, stackSize, capturedCount);
+
+    if(!funcLabel.empty()){
+        m_lambdas << "    call " << funcLabel << "\n";
+    } else {
+        emitPartialWrapClosureCall(wrapLabel, capturedCount);
+    }
+
+    m_lambdas << "    mov rsp, rbp\n";
+    m_lambdas << "    pop rbp\n";
+    m_lambdas << "    ret\n\n";
+
+    return wrapLabel;
+}
+
+//+
+//к genPartialWrapLambda
+//две вспомогательные для функции где настраивается стек и для самого тела
+
+void CodeGenerator::emitPartialWrapSetup(const std::string& wrapLabel, int stackSize, int capturedCount){
+    
     m_lambdas << wrapLabel << ":\n";
     m_lambdas << "    push rbp\n";
     m_lambdas << "    mov rbp, rsp\n";
@@ -684,117 +705,123 @@ std::string CodeGenerator::genPartialWrapLambda(const std::string& funcLabel, in
         m_lambdas << "    mov rax, [rbp-16]\n";
         m_lambdas << "    push rax\n";
     }
+}
 
-    if(!funcLabel.empty()){
-        m_lambdas << "    call " << funcLabel << "\n";
-    } else { //{env_ptr, code_ptr (lambda_wrap), closure_ptr(genFunc()), ...}
-        m_lambdas << "    mov rax, [rbp-8]\n"; //наш env_ptr
-        m_lambdas << "    mov rax, [rax + 0]\n"; //замыкание оригинала - первый слот env
-        m_lambdas << "    mov r11, [rax]\n"; //code_ptr оригинала
-        m_lambdas << "    mov rcx, [rax + 8]\n"; //env_ptr оригинала в rdi
+void CodeGenerator::emitPartialWrapClosureCall(const std::string& wrapLabel, int capturedCount){ 
+    m_lambdas << "    mov rax, [rbp-8]\n"; //наш env_ptr
+    m_lambdas << "    mov rax, [rax + 0]\n"; //замыкание оригинала - первый слот env
+    m_lambdas << "    mov r11, [rax]\n"; //code_ptr оригинала
+    m_lambdas << "    mov rcx, [rax + 8]\n"; //env_ptr оригинала в rdi
 
-        for(int i = 0; i < capturedCount; i++){
-            m_lambdas << "    mov rax, [rbp-8]\n";
-            m_lambdas << "    mov rax, [rax + " << (8 + i * 8) << "]\n";
-            m_lambdas << "    mov [rbp-" << (24 + i * 8) << "], rax\n";
-        }
-
-        for(int i = 0; i < capturedCount && i < 6; i++){
-            m_lambdas << "    mov " << argReg(i) << ", [rbp-" << (24 + i * 8) << "]\n";
-        }
-
-        if(capturedCount < 6){
-            m_lambdas << "    mov " << argReg(capturedCount) << ", [rbp-16]\n";
-        }
-
-        m_lambdas << "    test rcx, rcx\n";
-        m_lambdas << "    jz .call_direct_" << wrapLabel << "\n";
-    
-        m_lambdas << "    mov rdi, rcx\n";
-        m_lambdas << ".call_direct_" << wrapLabel << ":\n";
-        m_lambdas << "    call r11\n";
+    for(int i = 0; i < capturedCount; i++){
+        m_lambdas << "    mov rax, [rbp-8]\n";
+        m_lambdas << "    mov rax, [rax + " << (8 + i * 8) << "]\n";
+        m_lambdas << "    mov [rbp-" << (24 + i * 8) << "], rax\n";
     }
 
-    m_lambdas << "    mov rsp, rbp\n";
-    m_lambdas << "    pop rbp\n";
-    m_lambdas << "    ret\n\n";
+    for(int i = 0; i < capturedCount && i < 6; i++){
+        m_lambdas << "    mov " << argReg(i) << ", [rbp-" << (24 + i * 8) << "]\n";
+    }
 
-    return wrapLabel;
+    if(capturedCount < 6){
+        m_lambdas << "    mov " << argReg(capturedCount) << ", [rbp-16]\n";
+    }
+
+    m_lambdas << "    test rcx, rcx\n";
+    m_lambdas << "    jz .call_direct_" << wrapLabel << "\n";
+
+    m_lambdas << "    mov rdi, rcx\n";
+    m_lambdas << ".call_direct_" << wrapLabel << ":\n";
+    m_lambdas << "    call r11\n";
 }
+
+
 
 //замыкание {code_ptr, func_ptr, arg1, ...}
 void CodeGenerator::genPartialClosure(const std::string& wrapLabel, const std::string& funcLabel,
     const std::vector<int>& argOffsets, FuncContext& ctx){
 
-        int closureSize = 8 + 8 * static_cast<int>(argOffsets.size()); //адрес лямбда обертки - аргументы
+    if(funcLabel.empty()){
+        genPartialClosureUnknown(wrapLabel, argOffsets, ctx);
+    } else {
+        genPartialClosureKnown(wrapLabel, funcLabel, argOffsets, ctx);
+    }
+}
 
-        //нужно место под указатель на функцию
-        if(funcLabel.empty()){
-            int savedOff = ctx.allocLocal("__orig_func_ptr");
-            emit("mov [rbp" + std::to_string(savedOff) + "], rax");
+//+ 2 вспомогательные функции
 
-            int envSize = 8 + 8 * static_cast<int>(argOffsets.size());
-            emit("mov rdi, " + std::to_string(envSize));
-            emit("call __lang_malloc");
-            int envOff = ctx.allocLocal("__partial_env");
-            emit("mov [rbp" + std::to_string(envOff) + "], rax");
+//когда знаем метку функции
+void CodeGenerator::genPartialClosureKnown(const std::string& wrapLabel, const std::string& funcLabel,
+    const std::vector<int>& argOffsets, FuncContext& ctx){
 
-            emit("mov rcx, [rbp" + std::to_string(savedOff) + "]");
-            emit("mov [rax], rcx");
+        int envSize = 8 * static_cast<int>(argOffsets.size());
+        emit("mov rdi, " + std::to_string(envSize));
+        emit("call __lang_malloc");
+        int envOff = ctx.allocLocal("__partial_env");
+        emit("mov [rbp" + std::to_string(envOff) + "], rax");
 
-            for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){
-                emit("mov rax, [rbp" + std::to_string(envOff) + "]");
-                emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
-                emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
-            }
-
-            emit("mov rdi, 16");
-            emit("call __lang_malloc");
-            int ptrOff = ctx.allocLocal("__partial_ptr");
-            emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
-
-            emit("mov rcx, " + wrapLabel);
-            emit("mov [rax], rcx");
-
-            emit("mov rcx, [rbp" + std::to_string(envOff) + "]");
-            emit("mov [rax + 8], rcx");
-
-            emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
-            ctx.removeLocal("__partial_ptr");
-            ctx.removeLocal("__partial_env");
-            ctx.removeLocal("__orig_func_ptr");
-
-        } else {
-            int envSize = 8 * static_cast<int>(argOffsets.size()); //env отдельно аргументов
-            emit("mov rdi, " + std::to_string(envSize));
-            emit("call __lang_malloc");
-            int envOff = ctx.allocLocal("__partial_env");
-            emit("mov [rbp" + std::to_string(envOff) + "], rax"); //env_ptr
-
-            for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){ //аргументы в env
-                emit("mov rax, [rbp" + std::to_string(envOff) + "]");
-                emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
-                emit("mov [rax + " + std::to_string(i * 8) + "], rcx");
-            }
-
-            emit("mov rdi, 16"); //{code_ptr, env_ptr}
-            emit("call __lang_malloc");
-            int ptrOff = ctx.allocLocal("__partial_ptr");
-            emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
-
-            emit("mov rcx, " + wrapLabel); // code_ptr = wrapLabel
-            emit("mov [rax], rcx");
-
-            emit("mov rcx, [rbp" + std::to_string(envOff) + "]"); //env_ptr теперь указатель на env
-            emit("mov [rax + 8], rcx");
-
-            emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
-            ctx.removeLocal("__partial_ptr");
-            ctx.removeLocal("__partial_env");
+        for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){
+            emit("mov rax, [rbp" + std::to_string(envOff) + "]");
+            emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
+            emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
         }
 
+        emit("mov rdi, 16");
+        emit("call __lang_malloc");
+        int ptrOff = ctx.allocLocal("__partial_ptr");
+        emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
 
-    }
+        emit("mov rcx, " + wrapLabel);
+        emit("mov [rax], rcx");
+
+        emit("mov rcx, [rbp" + std::to_string(envOff) + "]");
+        emit("mov [rax + 8], rcx");
+
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+        ctx.removeLocal("__partial_ptr");
+        ctx.removeLocal("__partial_env");
+}
+
+//когда не знаем метку, то замыкание
+void CodeGenerator::genPartialClosureUnknown(const std::string& wrapLabel,
+    const std::vector<int>& argOffsets, FuncContext& ctx){
+
+        int savedOff = ctx.allocLocal("__orig_func_ptr");
+        emit("mov [rbp" + std::to_string(savedOff) + "], rax");
+
+        int envSize = 8 + 8 * static_cast<int>(argOffsets.size()); //env отдельно аргументов
+        emit("mov rdi, " + std::to_string(envSize));
+        emit("call __lang_malloc");
+        int envOff = ctx.allocLocal("__partial_env");
+        emit("mov [rbp" + std::to_string(envOff) + "], rax"); //env_ptr
+
+        emit("mov rcx, [rbp" + std::to_string(savedOff) + "]");
+        emit("mov [rax], rcx");
+
+        for(int i = 0; i < static_cast<int>(argOffsets.size()); i++){ //аргументы в env
+            emit("mov rax, [rbp" + std::to_string(envOff) + "]");
+            emit("mov rcx, [rbp" + std::to_string(argOffsets[i]) + "]");
+            emit("mov [rax + " + std::to_string(i * 8) + "], rcx");
+        }
+
+        emit("mov rdi, 16"); //{code_ptr, env_ptr}
+        emit("call __lang_malloc");
+        int ptrOff = ctx.allocLocal("__partial_ptr");
+        emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+
+        emit("mov rcx, " + wrapLabel); // code_ptr = wrapLabel
+        emit("mov [rax], rcx");
+
+        emit("mov rcx, [rbp" + std::to_string(envOff) + "]"); //env_ptr теперь указатель на env
+        emit("mov [rax + 8], rcx");
+
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+        ctx.removeLocal("__partial_ptr");
+        ctx.removeLocal("__partial_env");
+        ctx.removeLocal("__orig_func_ptr");
+}
+
+
 
 void CodeGenerator::genPartialApply(const CallExpr& e, const std::vector<int>&
     argOffsets, FuncContext& ctx){

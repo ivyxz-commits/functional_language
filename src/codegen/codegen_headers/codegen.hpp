@@ -88,6 +88,8 @@ private:
     //declarations
     void genDecl(const DeclNode& decl);
 
+    std::string getTypeNodeName(const TypeNode& node);
+
     //Объявление функции со вспомогательной функцией
     void genFuncDecl(const FuncDecl& fn);
     void genFuncParams(const FuncDecl& fn, FuncContext& ctx);
@@ -142,7 +144,11 @@ private:
     void genCallClosure(const std::vector<int>& argOffsets);
     void genCallIdent(const IdentExpr& ident, const CallExpr& e,
         const std::vector<int>& argOffsets, FuncContext& ctx); 
-
+    //дополнительные вспомогательные
+    std::vector<int> genCallPrepareArgs(const CallExpr& e, FuncContext& ctx);
+    bool genCallCheckClosure(const CallExpr& e, FuncContext& ctx);
+    void genCallLoadArgs(const std::vector<int>& argOffsets);
+    void genCallCleanup(const std::vector<int>& argOffsets, FuncContext& ctx);
 
     //вспомогательные для каррирования и частичного применения
      void genPartialApply(const CallExpr& e, const std::vector<int>&
@@ -152,9 +158,18 @@ private:
     bool isPartialCall(const ExprNode& e);
     std::string getCalleeFuncLabel(const CallExpr& e, FuncContext& ctx); //label оригинальной функции
     std::string genPartialWrapLambda(const std::string& funcLabel, int capturedCount);
+    //+ 2 вспомогательные
+    void emitPartialWrapSetup(const std::string& wrapLabel, int stackSize, int capturedCount);
+    void emitPartialWrapClosureCall(const std::string& wrapLabel, int capturedCount);
+
+
     void genPartialClosure(const std::string& wrapLabel, const std::string& funcLabel,
         const std::vector<int>& argOffsets, FuncContext& ctx); //code_ptr - лямбда обертки и захваченные аргументы 
-
+    //+2 вспомогательные
+    void genPartialClosureKnown(const std::string& wrapLabel, const std::string& funcLabel,
+        const std::vector<int>& argOffsets, FuncContext& ctx);
+    void genPartialClosureUnknown(const std::string& wrapLabel,
+        const std::vector<int>& argOffsets, FuncContext& ctx);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //patterns matching

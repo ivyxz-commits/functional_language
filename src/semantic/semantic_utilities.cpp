@@ -1,20 +1,20 @@
-#include "semantic_utils.hpp"
+#include "semantic_utilities.hpp"
 
 namespace Semantic{
 
-//вспомогательные static - функции
+//вспомогательные - функции
 
 
 //вывод типа из TypeInfo
-static std::string builtinToString(const BuiltinType& t){
+std::string builtinToString(const BuiltinType& t){
     return t.name;
 }
 
-static std::string simpleToString(const SimpleType& t){
+std::string simpleToString(const SimpleType& t){
     return t.name;
 }
 
-static std::string genericToString(const GenericType& t){
+std::string genericToString(const GenericType& t){
     std::string s = t.name + "[";
     for(int i = 0; i < t.args.size(); i++){ 
         if(i) s += ", ";
@@ -23,7 +23,7 @@ static std::string genericToString(const GenericType& t){
     return s + "]";
 }
 
-static std::string tupleToString(const TupleType& t){
+std::string tupleToString(const TupleType& t){
     std::string s = "(";
     for(int i = 0; i < t.elems.size(); i++){ 
         if(i) s += ", ";
@@ -32,17 +32,17 @@ static std::string tupleToString(const TupleType& t){
     return s + ")";
 }
 
-static std::string listToString(const ListType& t){
+std::string listToString(const ListType& t){
     return "[" + t.elem->toString() + "]";
 }
 
-static std::string functionToString(const FunctionType& t){
+std::string functionToString(const FunctionType& t){
     return t.from->toString() + " -> " + t.to->toString();
 }
 
 
 //analyze()
-static bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
+bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
     
     for(const auto& decl : decls){
         if(const auto* fn = std::get_if<FuncDecl>(&decl->var)){
@@ -54,7 +54,7 @@ static bool hasMainFunction(const std::vector<Ptr<DeclNode>>& decls){
 }
 
 //позиция для main()
-static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
+Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
     if(decls.empty()) return {1, 1};
     
     const auto& last = decls.back()->var;
@@ -69,7 +69,7 @@ static Pos lastDeclPos(const std::vector<Ptr<DeclNode>>& decls){
 
 
 //analyzeExpr()
-static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
+std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
     if(std::get_if<int64_t>(&e.value)) return makeBuiltin("int64");
     if(std::get_if<double>(&e.value)) return makeBuiltin("float64");
     if(std::get_if<std::string>(&e.value)) return makeBuiltin("string");
@@ -79,7 +79,7 @@ static std::optional<sPtr<TypeInfo>> analyzeLiteral(const LiteralExpr& e){
 }
 
 //analyzeDataDecl()
-static std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std::vector<std::string>& typeParams){
+std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std::vector<std::string>& typeParams){
     std::unordered_map<std::string, sPtr<TypeInfo>> typeVarMap;
     
     //тут пригодится таблица параметров типа для разрешения полей конструктора
@@ -92,21 +92,21 @@ static std::unordered_map<std::string, sPtr<TypeInfo>> buildTypeVarMap(const std
 
 
 //analyzeBinary()
-static bool isArithmetic(BinaryOp op){
+bool isArithmetic(BinaryOp op){
     return op == BinaryOp::Add || op == BinaryOp::Sub || 
            op == BinaryOp::Mul || op == BinaryOp::Div || op == BinaryOp::Mod;
 }
 
-static bool isComparison(BinaryOp op){
+bool isComparison(BinaryOp op){
     return op == BinaryOp::Lt || op == BinaryOp::Le ||
            op == BinaryOp::Gt || op == BinaryOp::Ge;
 }
 
-static bool isEquality(BinaryOp op){
+bool isEquality(BinaryOp op){
     return op == BinaryOp::Eq || op == BinaryOp::Neq;
 }
 
-static bool isLogical(BinaryOp op){
+bool isLogical(BinaryOp op){
     return op == BinaryOp::And || op == BinaryOp::Or;
 }
 
@@ -114,7 +114,7 @@ static bool isLogical(BinaryOp op){
 //analyzeLambda()
 
 //int64 -> (int64 -> int64) - потом обход слева направо
-static sPtr<TypeInfo> buildLambdaType(const std::vector<sPtr<TypeInfo>>& paramTypes, sPtr<TypeInfo> bodyType){
+sPtr<TypeInfo> buildLambdaType(const std::vector<sPtr<TypeInfo>>& paramTypes, sPtr<TypeInfo> bodyType){
     //идем справа налево, что получили, что возвратили
     sPtr<TypeInfo> funcType = bodyType;
     //так как лямбда это функция, то ее тип должен быть FunctionType

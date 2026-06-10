@@ -69,61 +69,61 @@ include CMakeFiles/lang.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/lang.dir/flags.make
 
-CMakeFiles/lang.dir/src/main.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/main.cpp.o: /home/ivan_su/project/src/main.cpp
-CMakeFiles/lang.dir/src/main.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/lang.dir/src/main.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/main.cpp.o -MF CMakeFiles/lang.dir/src/main.cpp.o.d -o CMakeFiles/lang.dir/src/main.cpp.o -c /home/ivan_su/project/src/main.cpp
+CMakeFiles/lang.dir/src/run/main.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/run/main.cpp.o: /home/ivan_su/project/src/run/main.cpp
+CMakeFiles/lang.dir/src/run/main.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/lang.dir/src/run/main.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/run/main.cpp.o -MF CMakeFiles/lang.dir/src/run/main.cpp.o.d -o CMakeFiles/lang.dir/src/run/main.cpp.o -c /home/ivan_su/project/src/run/main.cpp
 
-CMakeFiles/lang.dir/src/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/main.cpp > CMakeFiles/lang.dir/src/main.cpp.i
+CMakeFiles/lang.dir/src/run/main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/run/main.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/run/main.cpp > CMakeFiles/lang.dir/src/run/main.cpp.i
 
-CMakeFiles/lang.dir/src/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/main.cpp -o CMakeFiles/lang.dir/src/main.cpp.s
+CMakeFiles/lang.dir/src/run/main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/run/main.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/run/main.cpp -o CMakeFiles/lang.dir/src/run/main.cpp.s
 
-CMakeFiles/lang.dir/src/cli/options.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/cli/options.cpp.o: /home/ivan_su/project/src/cli/options.cpp
-CMakeFiles/lang.dir/src/cli/options.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/lang.dir/src/cli/options.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/cli/options.cpp.o -MF CMakeFiles/lang.dir/src/cli/options.cpp.o.d -o CMakeFiles/lang.dir/src/cli/options.cpp.o -c /home/ivan_su/project/src/cli/options.cpp
+CMakeFiles/lang.dir/src/run/cli/options.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/run/cli/options.cpp.o: /home/ivan_su/project/src/run/cli/options.cpp
+CMakeFiles/lang.dir/src/run/cli/options.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/lang.dir/src/run/cli/options.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/run/cli/options.cpp.o -MF CMakeFiles/lang.dir/src/run/cli/options.cpp.o.d -o CMakeFiles/lang.dir/src/run/cli/options.cpp.o -c /home/ivan_su/project/src/run/cli/options.cpp
 
-CMakeFiles/lang.dir/src/cli/options.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/cli/options.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/cli/options.cpp > CMakeFiles/lang.dir/src/cli/options.cpp.i
+CMakeFiles/lang.dir/src/run/cli/options.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/run/cli/options.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/run/cli/options.cpp > CMakeFiles/lang.dir/src/run/cli/options.cpp.i
 
-CMakeFiles/lang.dir/src/cli/options.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/cli/options.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/cli/options.cpp -o CMakeFiles/lang.dir/src/cli/options.cpp.s
+CMakeFiles/lang.dir/src/run/cli/options.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/run/cli/options.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/run/cli/options.cpp -o CMakeFiles/lang.dir/src/run/cli/options.cpp.s
 
-CMakeFiles/lang.dir/src/debug/dump.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/debug/dump.cpp.o: /home/ivan_su/project/src/debug/dump.cpp
-CMakeFiles/lang.dir/src/debug/dump.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/lang.dir/src/debug/dump.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/debug/dump.cpp.o -MF CMakeFiles/lang.dir/src/debug/dump.cpp.o.d -o CMakeFiles/lang.dir/src/debug/dump.cpp.o -c /home/ivan_su/project/src/debug/dump.cpp
+CMakeFiles/lang.dir/src/run/debug/dump.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/run/debug/dump.cpp.o: /home/ivan_su/project/src/run/debug/dump.cpp
+CMakeFiles/lang.dir/src/run/debug/dump.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/lang.dir/src/run/debug/dump.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/run/debug/dump.cpp.o -MF CMakeFiles/lang.dir/src/run/debug/dump.cpp.o.d -o CMakeFiles/lang.dir/src/run/debug/dump.cpp.o -c /home/ivan_su/project/src/run/debug/dump.cpp
 
-CMakeFiles/lang.dir/src/debug/dump.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/debug/dump.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/debug/dump.cpp > CMakeFiles/lang.dir/src/debug/dump.cpp.i
+CMakeFiles/lang.dir/src/run/debug/dump.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/run/debug/dump.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/run/debug/dump.cpp > CMakeFiles/lang.dir/src/run/debug/dump.cpp.i
 
-CMakeFiles/lang.dir/src/debug/dump.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/debug/dump.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/debug/dump.cpp -o CMakeFiles/lang.dir/src/debug/dump.cpp.s
+CMakeFiles/lang.dir/src/run/debug/dump.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/run/debug/dump.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/run/debug/dump.cpp -o CMakeFiles/lang.dir/src/run/debug/dump.cpp.s
 
-CMakeFiles/lang.dir/src/pipeline.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/pipeline.cpp.o: /home/ivan_su/project/src/pipeline.cpp
-CMakeFiles/lang.dir/src/pipeline.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/lang.dir/src/pipeline.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/pipeline.cpp.o -MF CMakeFiles/lang.dir/src/pipeline.cpp.o.d -o CMakeFiles/lang.dir/src/pipeline.cpp.o -c /home/ivan_su/project/src/pipeline.cpp
+CMakeFiles/lang.dir/src/run/pipeline.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/run/pipeline.cpp.o: /home/ivan_su/project/src/run/pipeline.cpp
+CMakeFiles/lang.dir/src/run/pipeline.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/lang.dir/src/run/pipeline.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/run/pipeline.cpp.o -MF CMakeFiles/lang.dir/src/run/pipeline.cpp.o.d -o CMakeFiles/lang.dir/src/run/pipeline.cpp.o -c /home/ivan_su/project/src/run/pipeline.cpp
 
-CMakeFiles/lang.dir/src/pipeline.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/pipeline.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/pipeline.cpp > CMakeFiles/lang.dir/src/pipeline.cpp.i
+CMakeFiles/lang.dir/src/run/pipeline.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/run/pipeline.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/run/pipeline.cpp > CMakeFiles/lang.dir/src/run/pipeline.cpp.i
 
-CMakeFiles/lang.dir/src/pipeline.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/pipeline.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/pipeline.cpp -o CMakeFiles/lang.dir/src/pipeline.cpp.s
+CMakeFiles/lang.dir/src/run/pipeline.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/run/pipeline.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/run/pipeline.cpp -o CMakeFiles/lang.dir/src/run/pipeline.cpp.s
 
 CMakeFiles/lang.dir/src/lexer/lexer.cpp.o: CMakeFiles/lang.dir/flags.make
 CMakeFiles/lang.dir/src/lexer/lexer.cpp.o: /home/ivan_su/project/src/lexer/lexer.cpp
@@ -209,68 +209,196 @@ CMakeFiles/lang.dir/src/parser/parser_types.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/parser/parser_types.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/parser/parser_types.cpp -o CMakeFiles/lang.dir/src/parser/parser_types.cpp.s
 
-CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: /home/ivan_su/project/src/semantic/semantic.cpp
-CMakeFiles/lang.dir/src/semantic/semantic.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic.cpp.o -c /home/ivan_su/project/src/semantic/semantic.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o: /home/ivan_su/project/src/semantic/semantic_types.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o -c /home/ivan_su/project/src/semantic/semantic_types.cpp
 
-CMakeFiles/lang.dir/src/semantic/semantic.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic.cpp > CMakeFiles/lang.dir/src/semantic/semantic.cpp.i
+CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_types.cpp > CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.i
 
-CMakeFiles/lang.dir/src/semantic/semantic.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic.cpp -o CMakeFiles/lang.dir/src/semantic/semantic.cpp.s
+CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_types.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.s
 
-CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: CMakeFiles/lang.dir/flags.make
-CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: /home/ivan_su/project/src/codegen/codegen.cpp
-CMakeFiles/lang.dir/src/codegen/codegen.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen.cpp.o -c /home/ivan_su/project/src/codegen/codegen.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o: /home/ivan_su/project/src/semantic/semantic_utilities.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o -c /home/ivan_su/project/src/semantic/semantic_utilities.cpp
 
-CMakeFiles/lang.dir/src/codegen/codegen.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen.cpp > CMakeFiles/lang.dir/src/codegen/codegen.cpp.i
+CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_utilities.cpp > CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.i
 
-CMakeFiles/lang.dir/src/codegen/codegen.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen.cpp -o CMakeFiles/lang.dir/src/codegen/codegen.cpp.s
+CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_utilities.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.s
+
+CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o: /home/ivan_su/project/src/semantic/semantic_decls.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o -c /home/ivan_su/project/src/semantic/semantic_decls.cpp
+
+CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_decls.cpp > CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.i
+
+CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_decls.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.s
+
+CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o: /home/ivan_su/project/src/semantic/semantic_exprs.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o -c /home/ivan_su/project/src/semantic/semantic_exprs.cpp
+
+CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_exprs.cpp > CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.i
+
+CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_exprs.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.s
+
+CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o: /home/ivan_su/project/src/semantic/semantic_call.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o -c /home/ivan_su/project/src/semantic/semantic_call.cpp
+
+CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_call.cpp > CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.i
+
+CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_call.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.s
+
+CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o: /home/ivan_su/project/src/semantic/semantic_match.cpp
+CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o -MF CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o.d -o CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o -c /home/ivan_su/project/src/semantic/semantic_match.cpp
+
+CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/semantic/semantic_match.cpp > CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.i
+
+CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/semantic/semantic_match.cpp -o CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.s
+
+CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o: /home/ivan_su/project/src/codegen/codegen_utilities.cpp
+CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o -c /home/ivan_su/project/src/codegen/codegen_utilities.cpp
+
+CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen_utilities.cpp > CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.i
+
+CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen_utilities.cpp -o CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.s
+
+CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o: /home/ivan_su/project/src/codegen/codegen_decls.cpp
+CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o -c /home/ivan_su/project/src/codegen/codegen_decls.cpp
+
+CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen_decls.cpp > CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.i
+
+CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen_decls.cpp -o CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.s
+
+CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o: /home/ivan_su/project/src/codegen/codegen_exprs.cpp
+CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o -c /home/ivan_su/project/src/codegen/codegen_exprs.cpp
+
+CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen_exprs.cpp > CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.i
+
+CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen_exprs.cpp -o CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.s
+
+CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o: CMakeFiles/lang.dir/flags.make
+CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o: /home/ivan_su/project/src/codegen/codegen_match.cpp
+CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o: CMakeFiles/lang.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o -MF CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o.d -o CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o -c /home/ivan_su/project/src/codegen/codegen_match.cpp
+
+CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ivan_su/project/src/codegen/codegen_match.cpp > CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.i
+
+CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ivan_su/project/src/codegen/codegen_match.cpp -o CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.s
 
 # Object files for target lang
 lang_OBJECTS = \
-"CMakeFiles/lang.dir/src/main.cpp.o" \
-"CMakeFiles/lang.dir/src/cli/options.cpp.o" \
-"CMakeFiles/lang.dir/src/debug/dump.cpp.o" \
-"CMakeFiles/lang.dir/src/pipeline.cpp.o" \
+"CMakeFiles/lang.dir/src/run/main.cpp.o" \
+"CMakeFiles/lang.dir/src/run/cli/options.cpp.o" \
+"CMakeFiles/lang.dir/src/run/debug/dump.cpp.o" \
+"CMakeFiles/lang.dir/src/run/pipeline.cpp.o" \
 "CMakeFiles/lang.dir/src/lexer/lexer.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_base.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_decls.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_exprs.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_patterns.cpp.o" \
 "CMakeFiles/lang.dir/src/parser/parser_types.cpp.o" \
-"CMakeFiles/lang.dir/src/semantic/semantic.cpp.o" \
-"CMakeFiles/lang.dir/src/codegen/codegen.cpp.o"
+"CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o" \
+"CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o" \
+"CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o" \
+"CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o" \
+"CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o" \
+"CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o" \
+"CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o" \
+"CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o" \
+"CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o" \
+"CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o"
 
 # External object files for target lang
 lang_EXTERNAL_OBJECTS =
 
-lang: CMakeFiles/lang.dir/src/main.cpp.o
-lang: CMakeFiles/lang.dir/src/cli/options.cpp.o
-lang: CMakeFiles/lang.dir/src/debug/dump.cpp.o
-lang: CMakeFiles/lang.dir/src/pipeline.cpp.o
+lang: CMakeFiles/lang.dir/src/run/main.cpp.o
+lang: CMakeFiles/lang.dir/src/run/cli/options.cpp.o
+lang: CMakeFiles/lang.dir/src/run/debug/dump.cpp.o
+lang: CMakeFiles/lang.dir/src/run/pipeline.cpp.o
 lang: CMakeFiles/lang.dir/src/lexer/lexer.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_base.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_decls.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_exprs.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_patterns.cpp.o
 lang: CMakeFiles/lang.dir/src/parser/parser_types.cpp.o
-lang: CMakeFiles/lang.dir/src/semantic/semantic.cpp.o
-lang: CMakeFiles/lang.dir/src/codegen/codegen.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_types.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_utilities.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_decls.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_exprs.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_call.cpp.o
+lang: CMakeFiles/lang.dir/src/semantic/semantic_match.cpp.o
+lang: CMakeFiles/lang.dir/src/codegen/codegen_utilities.cpp.o
+lang: CMakeFiles/lang.dir/src/codegen/codegen_decls.cpp.o
+lang: CMakeFiles/lang.dir/src/codegen/codegen_exprs.cpp.o
+lang: CMakeFiles/lang.dir/src/codegen/codegen_match.cpp.o
 lang: CMakeFiles/lang.dir/build.make
 lang: runtime_functions.o
 lang: CMakeFiles/lang.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Linking CXX executable lang"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ivan_su/project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Linking CXX executable lang"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/lang.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
