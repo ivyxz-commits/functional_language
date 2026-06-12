@@ -484,9 +484,10 @@ void CodeGenerator::genCallIdent(const IdentExpr& ident, const CallExpr& e,
                         suffix += "_" + mangleTypeName(tit->second);
                 }
 
+
                 std::string label = "__fn_" + ident.name + suffix;
-                if(!m_generatedInstances.count(label)){
-                    m_generatedInstances.insert(label);
+                if(!m_generatedInstances.count(label)){ //хранит метки уже сгенерированных типов
+                    m_generatedInstances.insert(label); //func(23) func(68) - второй вызов с тем же типом
                     genGenericFuncDecl(*m_genericFuncs[ident.name], label, typeVarMap);
                 }
                 emit("call " + label);

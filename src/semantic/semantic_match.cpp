@@ -62,7 +62,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeConstructor(
     //количество аргументов в конструкторе
     if(!checkConstructorArgCount(e, *ctorInfo, errors)) return std::nullopt;
     
-    //если ADT параметизирован, то есть присутсвует Generic, пока пропускаем это более сложная реализация
+    //ADT параметризирован
     auto dataInfo = m_registry.lookupData(ctorInfo->dataName);
     bool isGeneric = dataInfo && !dataInfo -> typeParams.empty();
 

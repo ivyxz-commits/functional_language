@@ -61,7 +61,7 @@ void CodeGenerator::genFuncDecl(const FuncDecl& fn){
         label += "_" + getTypeNodeName(*p.type);
     }
 
-    m_funcLabels[fn.name] = label;
+    m_funcLabels[fn.name] = label; //регистрируем метку
     emitLabel(label);
 
 
@@ -130,6 +130,7 @@ void CodeGenerator::genFuncParams(const FuncDecl& fn, FuncContext& ctx){
 *вспомогательные функции для Generic
 */
 
+//для gencallIdent в codegen
 //преобразование типа в уникальную строку для формирования метки функции
 //BuiltinType("int64") -> "int64"
 std::string CodeGenerator::mangleTypeName(const sPtr<TypeInfo>& type){
@@ -187,8 +188,8 @@ void CodeGenerator::genGenericFuncDecl(const FuncDecl& fn, const std::string& la
     std::swap(m_text, bodyStream);
 
     //вспомогательные для genFunc()
-    genFuncParams(fn, ctx);
-    genExpr(*fn.body, ctx);
+    genFuncParams(fn, ctx); //параметры
+    genExpr(*fn.body, ctx); //тело - возвратит rax
 
     emit("mov rsp, rbp");
     emit("pop rbp");

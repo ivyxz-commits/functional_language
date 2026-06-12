@@ -37,13 +37,13 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCall(
 bool Analyzer::analyzeCallGeneric(const CallExpr& e, std::optional<sPtr<TypeInfo>>& calleeType,
     sPtr<Environment> env, std::vector<SemanticError>& errors){
 
-        //Если дженерик без аргументов - ошибка
+        //Если дженерик без аргументов
         if(e.typeArgs.empty()){
             if(const auto* ident = std::get_if<IdentExpr>(&e.callee->var)){
                 if(m_funcTypeParams.count(ident->name)){
                     auto typeVarMap = inferenceTypeArgs(ident->name, e, env, errors);
                     if(!typeVarMap) return false;
-                    m_callTypeMaps[&e] = *typeVarMap;
+                    m_callTypeMaps[&e] = *typeVarMap; //сохраняем для кодогена
                     calleeType = changeTypeVars(**calleeType, *typeVarMap); //вставляем все разрешенные типы
                     checkGenericFuncBody(*m_genericFuncDecls[ident->name], *typeVarMap, env, errors);
                 }
@@ -75,7 +75,7 @@ bool Analyzer::analyzeCallGeneric(const CallExpr& e, std::optional<sPtr<TypeInfo
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallOverload(const IdentExpr& ident,
     const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
 
-        if(!m_overloads.count(ident.name) || m_overloads[ident.name].size() <= 1)
+        if(!m_overloads.count(ident.name) || m_overloads[ident.name].size() <= 1) //не с словаре перегрузок
             return std::nullopt;
 
             std::vector<sPtr<TypeInfo>> argTypes; //собираем типы аргументов
@@ -91,8 +91,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallOverload(const IdentExpr& ide
             m_resolvedOverloads[&e] = resolved; //для кодогена сохраняем перегрузку в словарик
 
             // возвращаем тип возврата выбранной перегрузки
-            auto typeVarMap = buildTypeVarMap(resolved->typeParams);
-            return resolveType(**resolved->returnType, typeVarMap, errors);
+            return resolveType(**resolved->returnType, {}, errors);
 }
 
 
@@ -108,7 +107,7 @@ void Analyzer::checkGenericFuncBody(const FuncDecl& fn,
         auto funcEnv = std::make_shared<Environment>(env);
 
         for(const auto& param : fn.params){ //из параметра конкретный тип
-            auto paramType = resolveType(*param.type, typeVarMap, errors);
+            auto paramType = resolveType(*param.type, typeVarMap, errors); //int64
             if(!paramType) continue; //x с типом int64, а не SimpleType("T")
             funcEnv->define(param.name, Symbol{param.name, *paramType, false, param.pos});
         }
@@ -124,6 +123,7 @@ void Analyzer::checkGenericFuncBody(const FuncDecl& fn,
         auto expectedType = resolveType(**fn.returnType, typeVarMap, errors);
         if(!expectedType) return;
 
+        //fn badexmp[T](x: T) -> T = 42 | badexmp("hi")
         if(!typesCompatible(**bodyType, **expectedType)){
             errors.push_back(makeError(
                 "function '" + fn.name + "' body type '" +
@@ -132,7 +132,7 @@ void Analyzer::checkGenericFuncBody(const FuncDecl& fn,
         }
 }
 
-//получить тип переменной
+//получить тип переменной, когда она указана fn[int64](20)
 std::optional<std::unordered_map<std::string, sPtr<TypeInfo>>>
     Analyzer::buildCallTypeVarMap(const std::string& funcName, 
         const std::vector<Ptr<TypeNode>>& typeArgs, sPtr<Environment> env,
@@ -168,7 +168,7 @@ sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
 
         if(const auto* st = std::get_if<SimpleType>(&type.var)){ //может быть просто строка типа T
             auto it = typeVarMap.find(st->name);
-            if(it != typeVarMap.end()) return it->second;
+            if(it != typeVarMap.end()) return it->second; //T -> int64
             return std::make_shared<TypeInfo>(type);
         }
 
@@ -204,13 +204,13 @@ sPtr<TypeInfo> Analyzer::changeTypeVars(const TypeInfo& type,
 
 //Унификация generic`ов 
 
-//для function и ADT
+//для function и ADT //рекурсивно тип параметра с типом аргумента
 void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
     std::unordered_map<std::string, sPtr<TypeInfo>>& typeVarMap,
     std::vector<SemanticError>& errors, const Pos& pos){
 
         if(const auto* st = std::get_if<SimpleType>(&param->var)){
-            auto it = typeVarMap.find(st->name);
+            auto it = typeVarMap.find(st->name); //T
 
             if(it != typeVarMap.end()){
                 
@@ -223,7 +223,7 @@ void Analyzer::unify(sPtr<TypeInfo> param, sPtr<TypeInfo> arg,
                         arg->toString() + "'", pos));
                 }
             } else {
-                typeVarMap[st->name] = arg;
+                typeVarMap[st->name] = arg; //{"T": int64}
             }
             return;
         }
@@ -455,7 +455,7 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<
             currentType = funcType->to;
         }
 
-        //каррирование <-> частичное применение
+        //каррирование
         if(std::get_if<FunctionType>(&currentType->var) && e.args.size() > 1){
             errors.push_back(makeError(
                 "partial application allows only one argument at a time, "

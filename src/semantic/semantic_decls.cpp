@@ -119,13 +119,13 @@ void Analyzer::firstPassFunc(const FuncDecl& fn, sPtr<Environment> env, std::vec
             "function '" + fn.name + "' is already declared", fn.pos));
     }
 
-    if(m_overloads[fn.name].size() == 1){ //первая перегрузка
+    if(m_overloads[fn.name].size() == 1){ //первая перегрузка //оригинальное имя в окружение
         env->define(fn.name, Symbol{fn.name, funcType, false, fn.pos});
     }
 
     if(!fn.typeParams.empty()){ //с отсутсвием параметров не записываем
-        m_funcTypeParams[fn.name] = fn.typeParams;
-        m_genericFuncDecls[fn.name] = &fn;
+        m_funcTypeParams[fn.name] = fn.typeParams; //T
+        m_genericFuncDecls[fn.name] = &fn; //указатель на функцию
     }
 }
 
@@ -168,11 +168,12 @@ bool Analyzer::checkOverloadDuplicate(const FuncDecl& fn,
         auto& overloads = m_overloads[fn.name]; //проверка на дубликат
         for(std::size_t i = 0; i < overloads.size() - 1; i++){
             const FuncDecl* other = overloads[i];
-            if(other->params.size() == fn.params.size()) continue; //сравнение типов параметров
+            if(other->params.size() == fn.params.size()) continue;
 
+            //если число параметров одинаковое сраниваем типы
             bool same = true;
             for(std::size_t j = 0; j < fn.params.size(); j++){
-                auto t1 = resolveType(*fn.params[j].type, typeVarMap, errors);
+                auto t1 = resolveType(*fn.params[j].type, typeVarMap, errors); //здесь TypeVarMap {}
                 auto t2 = resolveType(*other->params[j].type, typeVarMap, errors);
                 if(!t1 || !t2 || !(*t1)->equals(**t2)){
                     same = false; break; 
@@ -203,7 +204,7 @@ std::string Analyzer::buildMangledName(const FuncDecl& fn,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
+//для AnalyzeCallOverload
 //выбор нужной перегрузки
 const FuncDecl* Analyzer::resolveOverload(const std::string& name,
     const std::vector<sPtr<TypeInfo>>& argTypes,
@@ -232,6 +233,8 @@ const FuncDecl* Analyzer::resolveOverload(const std::string& name,
         "no matching overload for '" + name + "'", pos));
     return nullptr;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void Analyzer::firstPassModule(const ModuleDecl& mod, sPtr<Environment> env, std::vector<SemanticError>& errors){
     auto modEnv = std::make_shared<Environment>(env);
@@ -482,7 +485,7 @@ void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>&
     DataTypeInfo info; //информацию собираем о дата-типе
 
     info.name = data.name; //data Option[a] = //info.name = "Option"
-    info.typeParams = data.typeParams;
+    info.typeParams = data.typeParams; //T - typeParams
 
 
    auto typeVarMap = buildTypeVarMap(data.typeParams);
