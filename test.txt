@@ -1,62 +1,9 @@
-data Tree = Leaf | Node(int64, Tree, Tree) //дерево рекурсивное по своей природе
+//5. Дано трёхзначное число. Выяснить, является ли оно палиндромом («перевёртышем»), т.е. таким числом
+// десятичная запись которого читается одинаково слева направо и справа налево.
 
-fn insert(x: int64, t: Tree) -> Tree = 
-    //смотрим что за дерево пришло
-    match t {
-        Leaf -> Node(x, Leaf, Leaf),
-        Node(value, l, r) -> 
-            if x < value then Node(value, insert(x, l), r)
-            else if x > value then Node(value, l, insert(x, r))
-            else t //x = value
-    }
+fn isPalindrome(n: int64) -> bool = 
+    let a = n/100 in //env a = 1, n = 121
+    let c = n % 10 in 
+    a == c
 
-fn search(x: int64, t: Tree) -> string = //yep or nope
-    match t {
-        Leaf -> "nope\n",
-        Node(value, l, r) ->
-        if x == value then "yep\n" 
-        else if x < value then search(x, l)
-        else search(x, r)
-    }
-
-fn inorder(t: Tree) -> unit = //обход дерева в формате: лево -> корень -> право
-    match t{
-        Leaf -> unit,
-        Node(value, l, r) -> 
-            let _ = inorder(l) in
-            let _ = print(value) in inorder(r) 
-    }
-
-
-fn main() -> int64 = let t = Leaf in let t = insert(5, t) in
-    let t = insert(3, t) in let t = insert(1, t) in let t = insert(9, t) in
-    let t = insert(15, t) in let _ = inorder(t) in print(search(9, t))
-
-
-/*
-1) insert(5, Leaf) -> Node(5, Leaf, Leaf)  - возвратили
-
-2) insert(3, Node(5, Leaf, Leaf)) -> 
-3 < 5 Node(5, insert(3, Leaf), Leaf) ->
-insert(3, Leaf) -> Node(3, Leaf, Leaf) ->
-Node(5, Node(3, Leaf, Leaf), Leaf)
-
-3) insert(4, Node(5, Node(3, Leaf, Leaf)), Leaf) ->
-4 < 5 Node(5, insert(4, Node(3, Leaf, Leaf)), Leaf) ->
-insert(4, Node(3, Leaf, Leaf)) ->
-4 > 3 -> Node(3, Leaf, insert(4, Leaf)) ->
-insert(4, Leaf) -> Node(4, Leaf, Leaf) ->
-
-Result:
-Node(5, Node(3, Leaf, Node(4, Leaf, Leaf)), Leaf)
-*/
-
-/* 
-полученнное дерево - пример для inorder
-        5
-      /   \
-     3     6
-    /
-   1
-
-*/
+fn main() -> int64 = print(if isPalindrome(122) then "palindrome\n" else "not palindrome\n")

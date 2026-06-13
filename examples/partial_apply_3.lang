@@ -6,3 +6,10 @@ fn main() -> int64 =
     let f = getAdd() in
     let result = f(5)(10) in
     print(result)
+
+
+data Point = Point{x: int64, y: int64}
+
+fn main() -> int64 = 
+let p = Point{x = 1, y = 1} in 
+let {x, y} = p in print(a)  //имена паттерна должны совпадать с именем полей конструктора

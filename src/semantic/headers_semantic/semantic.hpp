@@ -272,6 +272,16 @@ private:
     bool defineLetBinding(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
         sPtr<Environment> letEnv, std::vector<SemanticError>& errors);    
 
+    //вспомогательные функции
+
+    void analyzeLetTuple(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+        sPtr<Environment> letEnv, std::vector<SemanticError>& errors);
+
+    void analyzeLetList(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+        sPtr<Environment> letEnv, std::vector<SemanticError>& errors);
+
+    void analyzeLetStruct(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+        sPtr<Environment> letEnv, std::vector<SemanticError>& errors);
 
     ///////////////////////////////////////
     //Match

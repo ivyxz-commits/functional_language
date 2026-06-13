@@ -256,10 +256,13 @@ struct MatchExpr{
     Pos pos;
 };
 
+enum class LetPatternKind {Name, Tuple, List, Struct};
 
 //let x = 5 или let x: int64 = 5;
 struct LetBinding{ 
     std::string name;
+    std::vector<std::string> names; //Tuple, List, Struct(ADT)
+    LetPatternKind patternKind = LetPatternKind::Name;
     std::optional<Ptr<TypeNode>> type;
     Ptr<ExprNode> value;
     Pos pos;

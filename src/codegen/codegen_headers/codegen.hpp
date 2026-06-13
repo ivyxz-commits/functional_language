@@ -111,13 +111,24 @@ private:
     void genIf(const IfExpr& e, FuncContext& ctx);
     void genMatch(const MatchExpr& e, FuncContext& ctx);
     void genLambda(const LambdaExpr& e, FuncContext& ctx);
-    void genLetIn(const LetInExpr& e, FuncContext& ctx);
     void genTuple(const TupleExpr& e, FuncContext& ctx);
     void genList(const ListExpr& e, FuncContext& ctx);
     void genCons(const ConsExpr& e, FuncContext& ctx);
     void genConstructor(const ConstructorExpr& e, FuncContext& ctx);
     
 
+
+
+    ///////////////////////////////////////////////////////////////////////////////
+    void genLetIn(const LetInExpr& e, FuncContext& ctx);
+
+    //+ вспомогательные для деструктуризации
+    void genLetTuple(const LetBinding& binding, int ptrOff,
+        FuncContext& ctx, std::vector<std::string>& boundNames);
+    void genLetList(const LetBinding& binding, int ptrOff,
+        FuncContext& ctx, std::vector<std::string>& boundNames);
+    void genLetStruct(const LetBinding& binding, int ptrOff,
+        FuncContext& ctx, std::vector<std::string>& boundNames);
     ///////////////////////////////////////////////////////////////////////////////
     void genLiteral(const LiteralExpr& e, FuncContext& ctx);
     //вспомогательные

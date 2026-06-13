@@ -3,7 +3,6 @@
 
 fn isPalindrome(n: int64) -> bool = 
     let a = n/100 in //env a = 1, n = 121
-    let b = (n / 10) % 10 in 
     let c = n % 10 in 
     a == c
 

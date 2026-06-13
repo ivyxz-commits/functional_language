@@ -432,11 +432,79 @@ std::expected<LetBinding, ParseError> Parser::parseLetBinding(){ //имена и
     using TT = Lexer::TokenType;
     auto pos = currentPos();
 
-    auto nameTok = expect(TT::IDENT);
-    if(!nameTok) return std::unexpected(nameTok.error());
+    LetBinding binding;
+    binding.pos = pos;
 
-    auto typeAnnot = parseOptionalType();
-    if(!typeAnnot) return std::unexpected(typeAnnot.error());
+    //кортеж
+    if(check(TT::DELIM_LPAREN)){
+        advance();
+        binding.patternKind = LetPatternKind::Tuple;
+        
+        auto first = expect(TT::IDENT);
+        if(!first) return std::unexpected(first.error());
+        
+        binding.names.push_back(first->lexeme);
+        
+        while(match(TT::DELIM_COMMA)){
+            auto n = expect(TT::IDENT);
+            if(!n) return std::unexpected(n.error());
+            binding.names.push_back(n->lexeme);
+        }
+
+        auto rp = expect(TT::DELIM_RPAREN);
+        if(!rp) return std::unexpected(rp.error());
+        binding.name = "_tuple_destruct";
+
+    } else if(check(TT::DELIM_LBRACKET)){ //let[x, y] = ...
+        advance();
+        binding.patternKind = LetPatternKind::List;
+
+        auto first = expect(TT::IDENT);
+        if(!first) return std::unexpected(first.error());
+
+        binding.names.push_back(first->lexeme);
+
+        while(match(TT::DELIM_COMMA)){
+            auto n = expect(TT::IDENT);
+            if(!n) return std::unexpected(n.error());
+            binding.names.push_back(n->lexeme);
+        }
+
+        auto rb = expect(TT::DELIM_RBRACKET);
+        if(!rb) return std::unexpected(rb.error());
+        binding.name = "_list_destruct";
+    
+    } else if(check(TT::DELIM_LBRACE)){
+        advance();
+        binding.patternKind = LetPatternKind::Struct;
+
+        auto first = expect(TT::IDENT);
+        if(!first) return std::unexpected(first.error());
+
+        binding.names.push_back(first->lexeme);
+
+        while(match(TT::DELIM_COMMA)){
+            auto n = expect(TT::IDENT);
+            if(!n) return std::unexpected(n.error());
+            binding.names.push_back(n->lexeme);
+        }
+
+        auto rb = expect(TT::DELIM_RBRACE);
+        if(!rb) return std::unexpected(rb.error());
+        binding.name = "_struct_destruct";
+    
+    } else {
+
+        auto nameTok = expect(TT::IDENT);
+        if(!nameTok) return std::unexpected(nameTok.error());
+
+        binding.name = nameTok->lexeme;
+        binding.patternKind = LetPatternKind::Name;
+
+        auto typeAnnot = parseOptionalType();
+        if(!typeAnnot) return std::unexpected(typeAnnot.error());
+        binding.type = std::move(*typeAnnot);
+    }
 
     auto eq = expect(TT::OP_ASSIGN);
     if(!eq) return std::unexpected(eq.error());
@@ -444,7 +512,8 @@ std::expected<LetBinding, ParseError> Parser::parseLetBinding(){ //имена и
     auto value = parseExpr();
     if(!value) return std::unexpected(value.error());
 
-    return LetBinding{std::move(nameTok -> lexeme), std::move(*typeAnnot), std::move(*value), pos};
+    binding.value = std::move(*value);
+    return binding;
 }
 
 std::expected<MatchArm, ParseError> Parser::parseMatchArm(){ //matchExprArm ::= pattern '->' expr ','?
@@ -589,7 +658,32 @@ std::expected<Ptr<ExprNode>, ParseError> Parser::parseIdentOrConstructorExpr(){
             }
             auto rp = expect(TT::DELIM_RPAREN);
             if(!rp) return std::unexpected(rp.error());
+        } 
+        else if(match(TT::DELIM_LBRACE)){
+            //именованные поля: Point{x = 1, y = 2}
+            auto first = expect(TT::IDENT);
+            if(!first) return std::unexpected(first.error());
+            
+            auto eq1 = expect(TT::OP_ASSIGN);
+            if(!eq1) return std::unexpected(eq1.error());
+            auto val1 = parseExpr();
+            if(!val1) return std::unexpected(val1.error());
+            args.push_back(std::move(*val1));
+
+            while(match(TT::DELIM_COMMA)){
+                auto n = expect(TT::IDENT);
+                if(!n) return std::unexpected(n.error());
+                auto eq = expect(TT::OP_ASSIGN);
+                if(!eq) return std::unexpected(eq.error());
+                auto val = parseExpr();
+                if(!val) return std::unexpected(val.error());
+                args.push_back(std::move(*val));
+            }
+
+            auto rb = expect(TT::DELIM_RBRACE);
+            if(!rb) return std::unexpected(rb.error());
         }
+
         ConstructorExpr ce{std::move(name), std::move(typeArgs), std::move(args), pos};
         return std::make_unique<ExprNode>(ExprNode{std::move(ce), pos});
     }

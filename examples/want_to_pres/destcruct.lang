@@ -1,0 +1,15 @@
+data Point = Point{x: int64, y: int64}
+
+fn main() -> int64 = 
+let p = Point{x = 1, y = 87878} in 
+let {x, y} = p in print(y)  //имена паттерна должны совпадать с именем полей конструктора
+
+/* 
+fn main() -> int64 = 
+    let(a, b) = (10, 20) in print(a)
+
+fn main() -> int64 = 
+    let[a, b, c] = [10, 20, 30] in
+    let _ = print(b) in print(c)
+
+*/

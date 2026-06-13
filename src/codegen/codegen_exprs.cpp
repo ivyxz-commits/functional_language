@@ -930,10 +930,28 @@ void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
     std::vector<std::string> boundNames; //let x, y = ... (x and y)
     
     for(const auto& binding : e.bindings){
-        genExpr(*binding.value, ctx);
-        int off = ctx.allocLocal(binding.name);
-        emit("mov [rbp" + std::to_string(off) + "], rax"); //локальную ячейку
-        boundNames.push_back(binding.name);
+        genExpr(*binding.value, ctx); //сначала вычисляем правую часть -> rax
+        
+        if(binding.patternKind == LetPatternKind::Tuple ||
+           binding.patternKind == LetPatternKind::List ||
+           binding.patternKind == LetPatternKind::Struct){
+
+            int ptrOff = ctx.allocLocal("__destruct");
+            emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+            boundNames.push_back("__destruct");
+
+            if(binding.patternKind == LetPatternKind::Tuple){
+                genLetTuple(binding, ptrOff, ctx, boundNames);
+            } else if(binding.patternKind == LetPatternKind::List){
+                genLetList(binding, ptrOff, ctx, boundNames);
+            } else {
+                genLetStruct(binding, ptrOff, ctx, boundNames);
+            }
+        } else{
+            int off = ctx.allocLocal(binding.name);
+            emit("mov [rbp" + std::to_string(off) + "], rax"); //локальную ячейку
+            boundNames.push_back(binding.name);
+        }
     }
 
     genExpr(*e.body, ctx); //обрабатываем тело
@@ -943,6 +961,96 @@ void CodeGenerator::genLetIn(const LetInExpr& e, FuncContext& ctx){
         ctx.removeLocal(name);
     }
 }
+
+//+ вспомогательные - деструктуризация 
+
+//{count, elem0, elem1, ...}
+void CodeGenerator::genLetTuple(const LetBinding& binding,
+    int ptrOff, FuncContext& ctx, std::vector<std::string>& boundNames){
+
+    for(std::size_t i = 0; i < binding.names.size(); i++){
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //указатель на кортеж в куче
+        emit("mov rcx, [rax + " + std::to_string(8 + i * 8) + "]"); //первый элемент
+        int off = ctx.allocLocal(binding.names[i]); //новая переменная
+        emit("mov [rbp" + std::to_string(off) + "], rcx"); //значение в этот слот
+        boundNames.push_back(binding.names[i]);
+    }
+}
+
+//{tag, head, tail}
+void CodeGenerator::genLetList(const LetBinding& binding,
+    int ptrOff, FuncContext& ctx, std::vector<std::string>& boundNames){
+
+    //runtime проверка длины - для списков размер неизвествен на этапе компиляции
+
+    std::string loopLabel = freshLabel("len_check");
+    std::string endLabel = freshLabel("len_end");
+    std::string panicLabel = freshLabel("len_panic");
+
+    // считаем длину списка
+    emit("xor rcx, rcx"); //count = 0
+    emit("mov rdx, [rbp" + std::to_string(ptrOff) + "]"); // rdx = ptr
+    emitLabel(loopLabel);
+    emit("mov rax, [rdx]"); //тег равен 0?
+    emit("cmp rax, 0");
+    emit("je " + panicLabel); //слишком короткий
+    emit("inc rcx");
+    emit("cmp rcx, " + std::to_string(binding.names.size()));
+    emit("je " + endLabel); // достаточно элементов
+    emit("mov rdx, [rdx + 16]"); // tail
+    emit("jmp " + loopLabel);
+    emitLabel(panicLabel);
+    // panic — список короче паттерна
+    emit("mov rdi, __div_zero_len"); // используем готовый panic
+    emit("call __lang_panic");
+    emitLabel(endLabel);
+
+    for(std::size_t i = 0; i < binding.names.size(); i++){
+
+        emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
+        emit("mov rcx, [rax + 8]"); //голова
+
+        int off = ctx.allocLocal(binding.names[i]);
+        emit("mov [rbp" + std::to_string(off) + "], rcx"); //кладем значение
+        boundNames.push_back(binding.names[i]);
+
+        emit("mov rax, [rax + 16]"); //по хвосту переход к следюующему
+        emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
+    }
+}
+
+//{tag, field0, field1, ...} берем поля по именам из реестра
+void CodeGenerator::genLetStruct(const LetBinding& binding,
+    int ptrOff, FuncContext& ctx, std::vector<std::string>& boundNames){
+
+    auto it = m_exprTypes.find(binding.value.get());
+    if(it == m_exprTypes.end()) return;
+
+    auto resolved = m_registry.resolveAlias(it->second);
+    auto* st = std::get_if<SimpleType>(&resolved->var);
+    if(!st) return;
+
+    auto dataInfo = m_registry.lookupData(st->name);
+    if(!dataInfo) return;
+
+    for(const auto& name : binding.names){
+        for(const auto& ctor : dataInfo->constructors){
+            for(std::size_t i = 0; i < ctor.fieldNames.size(); i++){
+                if(ctor.fieldNames[i] == name){
+                    emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //адрес Point в куче
+                    emit("mov rcx, [rax + " + std::to_string(8 + i * 8) + "]"); //1 поле
+                    int off = ctx.allocLocal(name); //новый слот
+                    emit("mov [rbp" + std::to_string(off) + "], rcx"); //кладем в этот слот значение
+                    boundNames.push_back(name);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+
+
 
 //Tuple {int64 count; int64 elems[count]} - куча
 void CodeGenerator::genTuple(const TupleExpr& e, FuncContext& ctx){
@@ -1041,9 +1149,9 @@ void CodeGenerator::genConstructor(const ConstructorExpr& e, FuncContext& ctx){
     emit("mov [rbp" + std::to_string(ptrOff) + "], rax");
 
     for(std::size_t i = 0; i < n; ++i){
-        emit("mov rcx, [rbp" + std::to_string(offsets[i]) + "]");
+        emit("mov rcx, [rbp" + std::to_string(offsets[i]) + "]"); //x = 1
         emit("mov rax, [rbp" + std::to_string(ptrOff) + "]");
-        emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx");
+        emit("mov [rax + " + std::to_string(8 + i * 8) + "], rcx"); //field[0] = x
     }
 
     emit("mov rax, [rbp" + std::to_string(ptrOff) + "]"); //указатель на конструктор

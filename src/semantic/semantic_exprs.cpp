@@ -221,6 +221,90 @@ std::optional<sPtr<TypeInfo>> Analyzer::checkLogical(const BinaryExpr& e, const 
         return makeBuiltin("bool");    
     }
 
+////////////////////////////////////////////////////////////
+//вспомогательные функции - отдельный вид деструктиризации
+//проверяет тип и связывает имена
+
+void Analyzer::analyzeLetTuple(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+    sPtr<Environment> letEnv, std::vector<SemanticError>& errors){
+
+    auto* tt = std::get_if<TupleType>(&valueType->var);
+
+    if(!tt){
+        errors.push_back(makeError(
+            "let tuple destructuring requires a tuple, got '" +
+            valueType->toString() + "'", binding.pos));
+        return;
+    }
+
+    if(tt->elems.size() != binding.names.size()){
+        errors.push_back(makeError(
+            "tuple has " + std::to_string(tt->elems.size()) +
+            " elements but pattern has " +
+            std::to_string(binding.names.size()), binding.pos));
+        return;
+    }
+
+    for(std::size_t i = 0; i < binding.names.size(); i++){
+        letEnv->define(binding.names[i],
+            Symbol{binding.names[i], tt->elems[i], false, binding.pos});
+    }
+}
+
+// список: let [x, y] = [1, 2] — проверяем что правая часть список
+void Analyzer::analyzeLetList(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+    sPtr<Environment> letEnv, std::vector<SemanticError>& errors){
+
+    auto* lt = std::get_if<ListType>(&valueType->var);
+    if(!lt){
+        errors.push_back(makeError(
+            "let list destructuring requires a list, got '" +
+            valueType->toString() + "'", binding.pos));
+        return;
+    }
+    
+    for(const auto& name : binding.names){
+        letEnv->define(name, Symbol{name, lt->elem, false, binding.pos});
+    }
+}
+
+//поля по именам в реестре
+void Analyzer::analyzeLetStruct(const LetBinding& binding, const sPtr<TypeInfo>& valueType,
+    sPtr<Environment> letEnv, std::vector<SemanticError>& errors){
+
+    auto resolved = m_registry.resolveAlias(valueType);
+    auto* st = std::get_if<SimpleType>(&resolved->var); //простое имя Point
+
+    if(!st){
+        errors.push_back(makeError(
+            "let struct destructuring requires a named type", binding.pos));
+        return;
+    }
+
+    auto dataInfo = m_registry.lookupData(st->name);
+
+    if(!dataInfo){
+        errors.push_back(makeError("unknown type '" + st->name + "'", binding.pos));
+        return;
+    }
+
+    for(const auto& name : binding.names){ //для каждого имени из паттерна
+        bool found = false;
+        for(const auto& ctor : dataInfo->constructors){ //конструктора дата типа
+            for(std::size_t i = 0; i < ctor.fieldNames.size(); i++){ //для каждого поля
+                if(ctor.fieldNames[i] == name){
+                    letEnv->define(name,
+                        Symbol{name, ctor.fieldTypes[i], false, binding.pos}); //x: int64
+                    found = true;
+                    break;
+                }
+            }
+            if(found) break;
+        }
+        if(!found) //поле не нашли - ошибка
+            errors.push_back(makeError("field '" + name + "' not found", binding.pos));
+    }
+}
 
 
 //analyze Let_in
@@ -235,8 +319,21 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeLetIn(
         auto valueType = analyzeExpr(*binding.value, letEnv, errors); 
         if(!valueType) continue;
 
-        if(!checkLetAnnotation(binding, *valueType, errors)) continue;
-        defineLetBinding(binding, *valueType, letEnv, errors);
+        if(binding.patternKind == LetPatternKind::Tuple){
+            analyzeLetTuple(binding, *valueType, letEnv, errors);
+        }
+
+        else if(binding.patternKind == LetPatternKind::List){
+            analyzeLetList(binding, *valueType, letEnv, errors);
+        }
+        else if(binding.patternKind == LetPatternKind::Struct){
+            analyzeLetStruct(binding, *valueType, letEnv, errors);
+        }
+        
+        else{
+            if(!checkLetAnnotation(binding, *valueType, errors)) continue;
+            defineLetBinding(binding, *valueType, letEnv, errors);
+        }
     }
 
     return analyzeExpr(*e.body, letEnv, errors); //передаем внутреннее выражение - body
