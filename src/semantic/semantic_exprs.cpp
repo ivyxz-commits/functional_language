@@ -48,7 +48,9 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeIdent(const IdentExpr& e,
     //встроенные функции нельзя использовать как значения
     if(e.name == "print" || e.name == "input" || 
         e.name == "exit"  || e.name == "panic" || 
-        e.name == "input_int" || e.name == "input_float"){
+        e.name == "input_int" || e.name == "input_float" ||
+        e.name == "typeof" || e.name == "max" ||
+        e.name == "min" || e.name == "length"){
         errors.push_back(makeError(
             "'" + e.name + "' must be called with ()", e.pos));
         return std::nullopt;

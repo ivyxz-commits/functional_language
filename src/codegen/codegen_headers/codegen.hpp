@@ -141,6 +141,12 @@ private:
     void genCall(const CallExpr& e, const ExprNode& node, FuncContext& ctx);
     //вспомогательные
     void genCallBuiltin(const IdentExpr& ident, const CallExpr& e);
+    //+ вспомогательные
+    void genBuiltinTypeof(const CallExpr& e);
+    void genBuiltinMax(const CallExpr& e);
+    void genBuiltinMin(const CallExpr& e);
+    void genBuiltinLength(const CallExpr& e);
+
     void genCallClosure(const std::vector<int>& argOffsets);
     void genCallIdent(const IdentExpr& ident, const CallExpr& e,
         const std::vector<int>& argOffsets, FuncContext& ctx); 

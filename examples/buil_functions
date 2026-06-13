@@ -1,0 +1,9 @@
+fn main() -> int64 = 
+    let xs = [1, 2, 3, 4, 5] in print(length(xs))
+
+/* fn main() -> int64 = 
+    let x = 42 in print(typeof(x))
+
+fn main() -> int64 = print(max(20.5, 20.46))
+
+*/

@@ -81,11 +81,31 @@ void Lexer::skipWhitespacesandComments(){
 
         if(std::isspace(static_cast<unsigned char>(c))){  //использование cctype
             advance();
-        } else if (c == '/' && peek(1) == '/') { 
+            
+        } else if (c == '/' && peek(1) == '/') {  //однострочнный комментарий
             while(!atEnd() && peek() != '\n'){ 
                 advance();
             }
-        } else { 
+
+        } else if(c == '/' && peek(1) == '*'){ //блочный комментарий
+            advance(); advance();
+            int depth = 1;
+            while(!atEnd() && depth > 0){
+                if(peek() == '/' && peek(1) == '*'){
+                    advance(); advance();
+                    depth++;
+                } else if(peek() == '*' && peek(1) == '/'){
+                    advance(); advance();
+                    depth--;
+                } else {
+                    advance();
+                }
+            }
+            
+            if(depth > 0){
+                m_errors.push_back(makeError("unfinishen block comment"));
+            }
+        } else {
             break;
         }
     }

@@ -1,4 +1,2 @@
-fn primer[T](x: T) -> T = x
-
 fn main() -> int64 = 
-    let y = primer(74) in print(y)
+    let xs = [1, 2, 3, 4, 5] in print(length(xs))

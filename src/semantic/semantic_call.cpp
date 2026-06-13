@@ -372,7 +372,10 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallBuiltin(const IdentExpr& iden
         if(ident.name == "print") return analyzeCallPrint(e, env, errors);
         if(ident.name == "input_int") return analyzeCallInput("input_int", e, "int64", errors);
         if(ident.name == "input_float") return analyzeCallInput("input_float", e, "float64", errors);
-
+        //метафункции
+        if(ident.name == "typeof") return analyzeBuiltinTypeof(e, env, errors);
+        if(ident.name == "max" || ident.name == "min") return analyzeBuiltinMaxMin(ident.name, e, env, errors);
+        if(ident.name == "length") return analyzeBuiltinLength(e, env, errors);
 
         //явные приведения
         if(ident.name == "float64"){
@@ -416,6 +419,59 @@ std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallBuiltin(const IdentExpr& iden
         return std::nullopt; //не встроенная функция
 
 }
+
+//вспомогательные typeof, min, max, len
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeBuiltinTypeof(const CallExpr& e,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    if(e.args.size() != 1){
+        errors.push_back(makeError("typeof() expects 1 argument", e.pos));
+        return std::nullopt;
+    }
+
+    analyzeExpr(*e.args[0], env, errors);
+    return makeBuiltin("string");
+}
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeBuiltinMaxMin(const std::string& name,
+    const CallExpr& e, sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    if(e.args.size() != 2){
+        errors.push_back(makeError(name + "() expects 2 arguments", e.pos));
+        return std::nullopt;
+    }
+    auto t1 = analyzeExpr(*e.args[0], env, errors);
+    auto t2 = analyzeExpr(*e.args[1], env, errors);
+    if(!t1 || !t2) return std::nullopt;
+    
+    if(!isNumericType(**t1) || !isNumericType(**t2)){
+        errors.push_back(makeError(name + "() requires numeric arguments", e.pos));
+        return std::nullopt;
+    }
+
+    if(isNumericWidening(**t1, **t2) || isNumericWidening(**t2, **t1))
+        return makeBuiltin("float64");
+    return *t1;
+}
+
+std::optional<sPtr<TypeInfo>> Analyzer::analyzeBuiltinLength(const CallExpr& e,
+    sPtr<Environment> env, std::vector<SemanticError>& errors){
+
+    if(e.args.size() != 1){
+        errors.push_back(makeError("length() expects 1 argument", e.pos));
+        return std::nullopt;
+    }
+    auto argType = analyzeExpr(*e.args[0], env, errors);
+    if(!argType) return std::nullopt;
+    if(!std::get_if<ListType>(&(*argType)->var)){
+        errors.push_back(makeError(
+            "length() expects a list, got '" + (*argType)->toString() + "'", e.pos));
+        return std::nullopt;
+    }
+    return makeBuiltin("int64");
+}
+
 
 std::optional<sPtr<TypeInfo>> Analyzer::analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
     sPtr<Environment> env, std::vector<SemanticError>& errors){

@@ -360,7 +360,17 @@ void CodeGenerator::genCall(const CallExpr& e,const ExprNode& node, FuncContext&
 
 //вспомогательные
 void CodeGenerator::genCallBuiltin(const IdentExpr& ident, const CallExpr& e){
-    if(ident.name == "print"){
+    
+    if(ident.name == "typeof")  genBuiltinTypeof(e);
+    
+    else if(ident.name == "max") genBuiltinMax(e);
+    
+    else if(ident.name == "min") genBuiltinMin(e);
+
+    else if(ident.name == "length") genBuiltinLength(e);
+
+    
+    else if(ident.name == "print"){
         if(!e.args.empty()){
             if(isFloatExpr(*e.args[0])){
                 emit("call lang_print_float");
@@ -434,10 +444,67 @@ void CodeGenerator::genCallBuiltin(const IdentExpr& ident, const CallExpr& e){
             }
         }
     }
-
-
 }
     
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//реализация typeof, min, max, len
+void CodeGenerator::genBuiltinTypeof(const CallExpr& e){
+    auto it = m_exprTypes.find(e.args[0].get());
+    std::string typeName = "unknown";
+    if(it != m_exprTypes.end()) typeName = it->second->toString();
+
+    std::string strLabel = freshStrLabel();
+    emitDataLabel(strLabel + "_len"); //__str_5_len
+    emitData("dq " + std::to_string(typeName.size() + 1)); //dq 5
+    emitDataLabel(strLabel + "_dat"); // str_5_dat:
+    emitData("db `" + typeName + "`, 10, 0"); //db `int64` 0
+    emit("mov rax, " + strLabel + "_len"); //{len, data}
+}
+
+void CodeGenerator::genBuiltinMax(const CallExpr& e){
+    bool isFloat = isFloatExpr(*e.args[0]) || isFloatExpr(*e.args[1]);
+    if(isFloat){
+        emit("movq xmm0, rdi");
+        emit("movq xmm1, rsi");
+        emit("maxsd xmm0, xmm1");
+        emit("movq rax, xmm0");
+    } else {
+        emit("cmp rdi, rsi");
+        emit("mov rax, rdi");
+        emit("cmovl rax, rsi"); //cond mov if less
+    }
+}
+
+void CodeGenerator::genBuiltinMin(const CallExpr& e){
+    bool isFloat = isFloatExpr(*e.args[0]) || isFloatExpr(*e.args[1]);
+    if(isFloat){
+        emit("movq xmm0, rdi");
+        emit("movq xmm1, rsi");
+        emit("minsd xmm0, xmm1");
+        emit("movq rax, xmm0");
+    } else {
+        emit("cmp rdi, rsi");
+        emit("mov rax, rdi");
+        emit("cmovg rax, rsi");
+    }
+}
+
+void CodeGenerator::genBuiltinLength(const CallExpr& e){
+    emit("xor rax, rax");
+    emit("mov rcx, rdi"); //начало списка
+    std::string loopLabel = freshLabel("len_loop");
+    std::string endLabel  = freshLabel("len_end");
+    emitLabel(loopLabel); //.len_loop
+    emit("mov rdx, [rcx]");
+    emit("cmp rdx, 0");
+    emit("je " + endLabel);
+    emit("inc rax"); //count++
+    emit("mov rcx, [rcx + 16]"); //next_ptr
+    emit("jmp " + loopLabel);
+    emitLabel(endLabel);
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 void CodeGenerator::genCallClosure(const std::vector<int>& argOffsets){ 
     emit("mov r11, [rax]");
     emit("mov rdi, [rax + 8]");

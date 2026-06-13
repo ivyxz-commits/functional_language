@@ -202,6 +202,17 @@ private:
     std::optional<sPtr<TypeInfo>> analyzeCallBuiltin(const IdentExpr& ident, const CallExpr& e, 
         sPtr<Environment> env, std::vector<SemanticError>& errors);
 
+    //вспомогательные typeof, min, max, len
+    std::optional<sPtr<TypeInfo>> analyzeBuiltinTypeof(const CallExpr& e, sPtr<Environment> env, 
+        std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> analyzeBuiltinMaxMin(const std::string& name, const CallExpr& e,
+        sPtr<Environment> env, std::vector<SemanticError>& errors);
+
+    std::optional<sPtr<TypeInfo>> analyzeBuiltinLength(const CallExpr& e, sPtr<Environment> env, 
+        std::vector<SemanticError>& errors);
+
+
     std::optional<sPtr<TypeInfo>> analyzeCallArgs(const CallExpr& e, sPtr<TypeInfo> calleeType,
         sPtr<Environment> env, std::vector<SemanticError>& errors);
 

@@ -73,6 +73,22 @@ sPtr<Environment> Analyzer::makeBuiltinEnv(){
         "input_float", makeFunction(makeBuiltin("unit"), makeBuiltin("float64")),
         false, {0,0}});
 
+    env->define("max", Symbol{
+        "max", makeFunction(makeBuiltin("unit"), makeBuiltin("unit")), 
+        false, {0, 0}});
+
+    env->define("min", Symbol{
+        "min", makeFunction(makeBuiltin("unit"), makeBuiltin("unit")), 
+        false, {0, 0}});
+
+    env->define("length", Symbol{
+        "length", makeFunction(makeBuiltin("unit"), makeBuiltin("unit")), 
+        false, {0, 0}});
+
+    env->define("typeof", Symbol{
+        "typeof", makeFunction(makeBuiltin("unit"), makeBuiltin("unit")), 
+        false, {0, 0}});
+        
     return env;
 }
 
