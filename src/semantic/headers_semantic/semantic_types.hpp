@@ -126,6 +126,7 @@ public:
     //зарегестрировать ADT
     bool registerData(DataTypeInfo info);
     bool registerAlias(const std::string& name, sPtr<TypeInfo> type);
+    bool updateData(DataTypeInfo info);
 
     //найти ADT по имени
     std::optional<DataTypeInfo> lookupData(const std::string& name) const;

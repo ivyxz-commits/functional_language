@@ -154,6 +154,14 @@ bool TypeRegistry::registerData(DataTypeInfo info){
     return true;
 }
 
+bool TypeRegistry::updateData(DataTypeInfo info){
+    for(const auto& ctor : info.constructors){ //обнровляем конструкторы
+        m_constructors[ctor.name] = ctor;
+    }
+    m_dataTypes[info.name] = std::move(info);
+    return true;
+}
+
 bool TypeRegistry::registerAlias(const std::string& name, sPtr<TypeInfo> type){
     if(m_aliases.count(name)) return false;
 

@@ -503,17 +503,22 @@ void Analyzer::analyzeDataDecl(const DataDecl& data, std::vector<SemanticError>&
     info.name = data.name; //data Option[a] = //info.name = "Option"
     info.typeParams = data.typeParams; //T - typeParams
 
+    //сначала регистирируем пустой тип
+    if(!m_registry.registerData(info)){
+        errors.push_back(makeError(
+            "type '" + data.name + "' is already declared", data.pos));
+        return;
+    }
 
    auto typeVarMap = buildTypeVarMap(data.typeParams);
 
     for(const auto& ctor : data.constructors){
-        info.constructors.push_back(buildConstructorInfo(ctor, data.name, typeVarMap, errors));
+        info.constructors.push_back(
+            buildConstructorInfo(ctor, data.name, typeVarMap, errors));
     }
 
-    if(!m_registry.registerData(std::move(info))){
-        errors.push_back(makeError(
-            "type '" + data.name + "' is already declared", data.pos));
-    }
+    m_registry.updateData(std::move(info));
+    
 }
 
 ConstructorInfo Analyzer::buildConstructorInfo(const ConstructorDecl& ctor, const std::string& dataName,
